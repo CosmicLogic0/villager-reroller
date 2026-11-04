@@ -109,7 +109,7 @@ public final class Calibration {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        if (entity.getType() != EntityType.VILLAGER) {
+        if (!"villager".equals(EntityType.getKey(entity.getType()).getPath())) {
             Msg.warn(mc, "That's not a villager. Right-click the villager that should get the new job.");
             return;
         }
