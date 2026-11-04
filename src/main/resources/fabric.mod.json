@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "villagerreroller",
+  "version": "${version}",
+  "name": "Villager Reroller",
+  "description": "Automatically rerolls a librarian's trades (break and replace the lectern) until it offers the enchanted book you want at a price you accept. Client-side, with an in-game menu.",
+  "authors": [
+    "CosmicLogic"
+  ],
+  "contact": {
+    "homepage": "https://github.com/CosmicLogic0/villager-reroller",
+    "sources": "https://github.com/CosmicLogic0/villager-reroller",
+    "issues": "https://github.com/CosmicLogic0/villager-reroller/issues"
+  },
+  "license": "All-Rights-Reserved",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.villagerreroller.VillagerRerollerClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
