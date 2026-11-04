@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -70,7 +71,6 @@ public final class GameActions {
         } else {
             gm.startDestroyBlock(pos, face);
         }
-        mc.player.swing(InteractionHand.MAIN_HAND);
     }
 
     /** Right-click a block face using the recorded hit (this is how the lectern gets placed). */
@@ -79,7 +79,6 @@ public final class GameActions {
             return;
         }
         mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, hit);
-        mc.player.swing(InteractionHand.MAIN_HAND);
     }
 
     /** Right-click a villager (opens its trade screen). */
@@ -87,7 +86,7 @@ public final class GameActions {
         if (mc.gameMode == null || mc.player == null) {
             return;
         }
-        mc.gameMode.interact(mc.player, entity, InteractionHand.MAIN_HAND);
+        mc.gameMode.interact(mc.player, entity, new EntityHitResult(entity, entity.getBoundingBox().getCenter()), InteractionHand.MAIN_HAND);
     }
 
     public static void closeScreenAndContainer(Minecraft mc) {
