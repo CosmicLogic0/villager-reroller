@@ -1,0 +1,54 @@
+# Builds the mod and publishes it as a GitHub pre-release (jar attached).
+# Also copies the jar to the "dist" branch so it can be fetched from raw.githubusercontent.com.
+# Run it from the Actions tab (Run workflow).
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+      - run: gradle build --no-daemon
+      - name: Pick the jar
+        id: jar
+        run: |
+          mkdir -p out
+          for f in build/libs/*.jar; do case "$f" in *-sources.jar|*-dev.jar) ;; *) cp "$f" out/ ;; esac; done
+          ls -la out
+          v=$(grep '^mod_version=' gradle.properties | cut -d= -f2)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "file=$(ls out/*.jar | head -1)" >> "$GITHUB_OUTPUT"
+          cp "$(ls out/*.jar | head -1)" out/villager-reroller.jar
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.jar.outputs.version }}
+          name: Villager Reroller ${{ steps.jar.outputs.version }} (Minecraft 26.3, Fabric)
+          prerelease: true
+          body_path: CHANGELOG.md
+          files: ${{ steps.jar.outputs.file }}
+      - name: Copy the jar to the dist branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp out/villager-reroller.jar /tmp/villager-reroller.jar
+          cp "${{ steps.jar.outputs.file }}" /tmp/
+          git checkout --orphan dist
+          git rm -rf . > /dev/null
+          cp /tmp/villager-reroller.jar .
+          cp "/tmp/$(basename "${{ steps.jar.outputs.file }}")" .
+          git add *.jar
+          git commit -m "Jar for ${{ steps.jar.outputs.version }}"
+          git push -f origin dist
