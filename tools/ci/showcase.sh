@@ -68,8 +68,9 @@ sleep 12
 srv "tp Steve 2.7 -60 0.5 -90 16"
 sleep 4
 
-mod "hud off"; sleep 1; shot scene
-mod "hud on"; sleep 1; shot scene-hud
+shot scene-hud
+DISPLAY=:99 xdotool key F1; sleep 1.5; shot scene
+DISPLAY=:99 xdotool key F1; sleep 1
 
 # --- the menu
 mod "rules"
