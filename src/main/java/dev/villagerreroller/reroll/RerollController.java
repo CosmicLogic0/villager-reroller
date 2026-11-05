@@ -2,6 +2,7 @@ package dev.villagerreroller.reroll;
 
 import dev.villagerreroller.game.GameActions;
 import dev.villagerreroller.game.Msg;
+import dev.villagerreroller.game.Sounds;
 import dev.villagerreroller.game.VillagerReader;
 import dev.villagerreroller.logic.BookOffer;
 import dev.villagerreroller.logic.DayCycle;
@@ -10,9 +11,7 @@ import dev.villagerreroller.logic.RerollerConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.MerchantScreen;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.core.BlockPos;
-import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Blocks;
@@ -171,6 +170,7 @@ public final class RerollController {
         movedForNight = false;
         startedAtMs = System.currentTimeMillis();
         Msg.ok(mc, "Rerolling started. Press the toggle key (B) or use /vr stop to stop.");
+        Sounds.started(mc);
         return true;
     }
 
@@ -184,13 +184,10 @@ public final class RerollController {
         String stats = " (" + rerolls + " rerolls in " + secs + "s)";
         if (success) {
             Msg.ok(mc, reason + stats);
-            try {
-                mc.getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.PLAYER_LEVELUP, 1.0F, 0.8F));
-            } catch (RuntimeException ignored) {
-                // a missing sound must never break the stop
-            }
+            Sounds.found(mc);
         } else {
             Msg.warn(mc, "Stopped: " + reason + stats);
+            Sounds.stopped(mc);
         }
     }
 
@@ -488,10 +485,6 @@ public final class RerollController {
         }
 
         GameActions.closeScreenAndContainer(mc);
-        if (cfg.maxRerolls > 0 && rerolls >= cfg.maxRerolls) {
-            stop(mc, "reached the reroll limit.", false);
-            return;
-        }
         go(State.BREAK_PREP, cfg.actionDelayTicks);
     }
 
