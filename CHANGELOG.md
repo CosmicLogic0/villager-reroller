@@ -1,3 +1,13 @@
+## 0.3.0-beta.1
+- **New look for the menu.** One clean dark panel with the status at the top, a toolbar (Calibrate, Bed, Night, Sounds, Accept any) and a big Start / Stop button.
+- **Drop-down sections.** Enchantments are sorted into sections (Swords & Axes, Tools, Armor, Boots, Bow...) that open and close with a click. Each section has its own icon and shows how many enchants you want or avoid. "Expand all" and "Collapse all" are at the bottom, and the list scrolls with the mouse wheel.
+- **Icons and hover details.** Every enchantment has an icon. Hover over it to see what it does, what it works on, its max level and the cheapest possible price.
+- **Emerald price display.** Prices show an emerald icon with the number instead of "(<=34)".
+- **Want all / Avoid all / Clear only at the top.** They apply to everything listed (they follow the search and Show filter).
+- **Sounds.** A chime when rerolling starts, a low note when it stops, and a fanfare when your book is found. Turn them off with "Sounds" in the menu.
+- **Removed:** the "Max rerolls" limit and the separate "Max %" for Accept any. Accept any now uses each enchant's own price limit (150% unless you change it).
+- Right-click the Ignore/Want/Avoid and level buttons to go back a step.
+
 ## 0.2.0-beta.1
 - **Fixed: the lectern never broke.** Breaking is now a real held break (it used to restart every tick, like spam-clicking).
 - **Fixed: rerolling stopped after ~14 seconds** when the villager was slow to take the job. It now keeps waiting (60 s by default, `claimTimeoutSeconds` in the config), and if the villager still hasn't taken the job it breaks and re-places the lectern instead of stopping.

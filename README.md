@@ -2,20 +2,21 @@
 
 A **client-side Fabric mod for Minecraft 26.3** that rerolls a librarian villager's trades for you. It breaks and replaces the lectern over and over, reads the enchanted book on offer, and stops when it finds the enchantment you want at a price you're happy with.
 
-> **Status: beta (0.2.0-beta.1).** Written against Minecraft 26.3 / Fabric Loader 0.19.5 / Fabric API 0.164.0+26.3. See [Known limitations](#known-limitations).
+> **Status: beta (0.3.0-beta.1).** Written against Minecraft 26.3 / Fabric Loader 0.19.5 / Fabric API 0.164.0+26.3. See [Known limitations](#known-limitations).
 
 ## Features
 
 - **Calibration sequence** – you do the routine once by hand (place lectern, click villager, break lectern, optionally click your bed) and the mod copies it. **Your camera never moves**: positions are remembered, so you can look around and shuffle a little while it works.
 - **Night handling** – villagers sleep at night instead of taking jobs, so the mod sleeps in your bed, walks you back to your spot and carries on (or waits for morning if there's no bed).
 - **Patient** – waits up to 60 s for the villager to take the job, then re-places the lectern instead of giving up. Spare lecterns in your hotbar are used if the broken one gets stuck.
-- **In-game menu** (default key **V**, or `/vr`) listing every enchantment a librarian can sell, **grouped by type** (swords, tools, armor, boots, bow, crossbow, trident, mace, fishing, curses...) with **Want all / Avoid all / Clear** per group and for everything, plus search. For each enchantment choose:
+- **In-game menu** (default key **V**, or `/vr`) listing every enchantment a librarian can sell in **drop-down sections by type** (swords, tools, armor, boots, bow, crossbow, trident, mace, fishing, curses...), each enchant with an **icon** and a **hover tooltip** explaining what it does. **Want all / Avoid all / Clear** at the top apply to everything listed, and there's a search box and a Wanted/Avoided filter. For each enchantment choose:
   - **Ignore / Want / Avoid**
   - **Minimum level** (default: max level only)
-  - **Price limit as a % of the best possible price** – `100%` means only the cheapest possible roll; `150%` accepts anything up to 1.5× the cheapest. The menu shows the resulting emerald limit next to the percentage.
-- **Accept any non-avoided enchant** option with its own price limit.
+  - **Price limit as a % of the best possible price** – `100%` means only the cheapest possible roll; `150%` accepts anything up to 1.5× the cheapest. The menu shows the resulting emerald limit (with an emerald icon) next to the percentage.
+- **Accept any non-avoided enchant** option (uses each enchant's own price limit).
+- **Sounds** when rerolling starts, stops, and when your book is found (can be turned off).
 - Stops on a match with the **trade screen still open and the lectern left in place**, so you can buy the book right away.
-- Safety stops: reroll limit, you take damage, you open another screen, villager/lectern out of reach, trades not changing (villager already traded with), lectern not picked up.
+- Safety stops: you take damage, you open another screen, villager/lectern out of reach, trades not changing (villager already traded with), lectern not picked up.
 - Settings saved to `config/villagerreroller.json`.
 
 ## Install
