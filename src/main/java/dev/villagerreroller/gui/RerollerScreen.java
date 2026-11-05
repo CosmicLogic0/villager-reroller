@@ -243,7 +243,7 @@ public final class RerollerScreen extends Screen {
     private void drawToolbar(GuiGraphicsExtractor g, int mx, int my, RerollerConfig cfg) {
         Minecraft mc = Minecraft.getInstance();
         var cal = VillagerRerollerClient.CALIBRATION;
-        int bw = (iw - 4 * 6) / 5;
+        int bw = (iw - 4 * 6 - 100) / 4; // the last button ("Accept any") gets 100
         int x = ix;
         int y = toolbarY;
 
@@ -414,7 +414,7 @@ public final class RerollerScreen extends Screen {
         zones.add(new Zone(ix, y, right, y + ROW_H, null, entryTooltip(e, rule, priceActive, best, limit, level)));
 
         int r = right - 4;
-        int modeX = r - 182;
+        int modeX = r - 192;
         int nameColor = switch (mode) {
             case WANT -> GREEN;
             case AVOID -> RED;
@@ -434,7 +434,7 @@ public final class RerollerScreen extends Screen {
         boolean levelActive = mode == EnchantRule.Mode.WANT && e.maxLevel() > 1;
         String lvl = e.maxLevel() <= 1 ? "I" : rule.minLevel <= 0 ? "Max " + EnchantInfo.roman(e.maxLevel())
                 : EnchantInfo.roman(level) + "+";
-        button(g, mx, my, r - 136, y + 2, 36, 16, lvl, Style.NORMAL, levelActive, b -> {
+        button(g, mx, my, r - 146, y + 2, 46, 16, lvl, Style.NORMAL, levelActive, b -> {
             EnchantRule rr = cfg.rule(e.id());
             rr.minLevel = b == 1 ? prevMinLevel(rr.minLevel, e.maxLevel()) : nextMinLevel(rr.minLevel, e.maxLevel());
         }, e.maxLevel() <= 1 ? tip("Level", "This enchant only has one level.")
