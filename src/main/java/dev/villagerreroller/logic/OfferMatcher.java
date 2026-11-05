@@ -46,7 +46,8 @@ public final class OfferMatcher {
             return new MatchResult(o, Verdict.WANTED_MATCH, best, percent);
         }
         if (cfg.acceptAnyNotAvoided) {
-            if (!PriceCalc.withinPercent(o.price(), best, cfg.anyMaxPercent)) {
+            int limit = r != null ? r.maxPercent : EnchantRule.DEFAULT_MAX_PERCENT;
+            if (!PriceCalc.withinPercent(o.price(), best, limit)) {
                 return new MatchResult(o, Verdict.TOO_EXPENSIVE, best, percent);
             }
             return new MatchResult(o, Verdict.ANY_MATCH, best, percent);

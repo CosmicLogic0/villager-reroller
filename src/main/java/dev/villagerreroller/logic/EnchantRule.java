@@ -19,6 +19,9 @@ public final class EnchantRule {
         }
     }
 
+    /** Price limit used when nothing was changed. */
+    public static final int DEFAULT_MAX_PERCENT = 150;
+
     public Mode mode = Mode.IGNORE;
 
     /** Minimum acceptable level. 0 (or less) means "only the maximum level". */
@@ -28,7 +31,7 @@ public final class EnchantRule {
      * Highest acceptable price as a percentage of the best possible price for the offered level.
      * 100 = only the cheapest possible roll, 150 = up to 1.5x the cheapest possible roll.
      */
-    public int maxPercent = 150;
+    public int maxPercent = DEFAULT_MAX_PERCENT;
 
     /** The level actually required for an enchant whose maximum level is {@code maxLevel}. */
     public int requiredLevel(int maxLevel) {

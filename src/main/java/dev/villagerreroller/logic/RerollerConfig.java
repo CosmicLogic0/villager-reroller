@@ -23,12 +23,14 @@ public final class RerollerConfig {
 
     public Map<String, EnchantRule> rules = new LinkedHashMap<>();
 
-    /** If true, any enchant that is not marked AVOID is accepted when its price is within {@link #anyMaxPercent}. */
+    /**
+     * If true, any enchant that is not marked AVOID is accepted when its price is within that enchant's own
+     * price limit (the % shown on its row, 150% unless you changed it).
+     */
     public boolean acceptAnyNotAvoided = false;
-    public int anyMaxPercent = 150;
 
-    /** Safety stop. 0 = unlimited. */
-    public int maxRerolls = 500;
+    /** Play a sound when rerolling starts, stops, and when a wanted book is found. */
+    public boolean sounds = true;
 
     /** Ticks to wait between actions (20 ticks = 1 second). */
     public int actionDelayTicks = 2;
@@ -80,8 +82,6 @@ public final class RerollerConfig {
             r.maxPercent = clamp(r.maxPercent, 100, 1000);
             r.minLevel = clamp(r.minLevel, 0, 10);
         }
-        anyMaxPercent = clamp(anyMaxPercent, 100, 1000);
-        maxRerolls = clamp(maxRerolls, 0, 1_000_000);
         actionDelayTicks = clamp(actionDelayTicks, 1, 40);
         claimWaitTicks = clamp(claimWaitTicks, 5, 200);
         claimTimeoutSeconds = clamp(claimTimeoutSeconds, 10, 600);
