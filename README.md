@@ -2,12 +2,14 @@
 
 A **client-side Fabric mod for Minecraft 26.3** that rerolls a librarian villager's trades for you. It breaks and replaces the lectern over and over, reads the enchanted book on offer, and stops when it finds the enchantment you want at a price you're happy with.
 
-> **Status: beta (0.1.0-beta.1).** Written against Minecraft 26.3 / Fabric Loader 0.19.5 / Fabric API 0.164.0+26.3. See [Known limitations](#known-limitations).
+> **Status: beta (0.2.0-beta.1).** Written against Minecraft 26.3 / Fabric Loader 0.19.5 / Fabric API 0.164.0+26.3. See [Known limitations](#known-limitations).
 
 ## Features
 
-- **Calibration sequence** – you do the routine once by hand (place lectern, click villager, break lectern) and the mod copies it exactly.
-- **In-game menu** (default key **V**, or `/vr`) listing every enchantment a librarian can sell. For each one choose:
+- **Calibration sequence** – you do the routine once by hand (place lectern, click villager, break lectern, optionally click your bed) and the mod copies it. **Your camera never moves**: positions are remembered, so you can look around and shuffle a little while it works.
+- **Night handling** – villagers sleep at night instead of taking jobs, so the mod sleeps in your bed, walks you back to your spot and carries on (or waits for morning if there's no bed).
+- **Patient** – waits up to 60 s for the villager to take the job, then re-places the lectern instead of giving up. Spare lecterns in your hotbar are used if the broken one gets stuck.
+- **In-game menu** (default key **V**, or `/vr`) listing every enchantment a librarian can sell, **grouped by type** (swords, tools, armor, boots, bow, crossbow, trident, mace, fishing, curses...) with **Want all / Avoid all / Clear** per group and for everything, plus search. For each enchantment choose:
   - **Ignore / Want / Avoid**
   - **Minimum level** (default: max level only)
   - **Price limit as a % of the best possible price** – `100%` means only the cheapest possible roll; `150%` accepts anything up to 1.5× the cheapest. The menu shows the resulting emerald limit next to the percentage.
@@ -29,10 +31,10 @@ Client-side only: nothing needs installing on the server.
 1. Set up a villager that has **never been traded with**, next to a spot for a lectern, with a bed and a way to stand within reach of both.
 2. Put a **lectern in your hotbar** and stand where you'll stay.
 3. Press **V**, choose enchantments and prices, press **Calibrate**.
-4. Follow the chat prompts: **place** the lectern → **right-click** the villager → **break** the lectern (with the tool you want used). Make sure the lectern item ends up back in your hotbar.
+4. Follow the chat prompts: **place** the lectern → **right-click** the villager → **break** the lectern (with the tool you want used) → optionally **right-click a bed** a few blocks away (or `/vr skipbed`). Keep a spare lectern or two in your hotbar.
 5. Press **V** → **Start rerolling** (or **B**, or `/vr start`). Press **B** or use `/vr stop` to stop.
 
-Commands: `/vr` (menu), `/vr calibrate`, `/vr start`, `/vr stop`, `/vr status`.
+Commands: `/vr` (menu), `/vr calibrate`, `/vr start`, `/vr stop`, `/vr status`, `/vr setbed`, `/vr skipbed`.
 
 ### How the price percentage works
 
