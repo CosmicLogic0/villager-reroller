@@ -156,10 +156,20 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                 LOGGER.info("VRTEST in world");
             } else if (selftestTicks == 60) {
                 mc.gui.setScreen(new RerollerScreen());
-            } else if (selftestTicks == 90) {
+            } else if (selftestTicks == 70) {
+                // a realistic menu for the CI screenshots
+                config.rule("minecraft:mending").mode = dev.villagerreroller.logic.EnchantRule.Mode.WANT;
+                config.rule("minecraft:unbreaking").mode = dev.villagerreroller.logic.EnchantRule.Mode.WANT;
+                config.rule("minecraft:sharpness").mode = dev.villagerreroller.logic.EnchantRule.Mode.WANT;
+                config.rule("minecraft:binding_curse").mode = dev.villagerreroller.logic.EnchantRule.Mode.AVOID;
+                RerollerScreen.expandForTest(dev.villagerreroller.logic.EnchantGroups.Group.UNIVERSAL,
+                        dev.villagerreroller.logic.EnchantGroups.Group.MELEE);
+                LOGGER.info("VRTEST menu shot");
+            } else if (selftestTicks == 400) {
                 boolean open = mc.gui.screen() instanceof RerollerScreen;
                 int enchants = dev.villagerreroller.game.EnchantCatalog.tradeable(mc).size();
                 LOGGER.info("VRTEST menu open={} enchants={}", open, enchants);
+                config.rules.clear();
                 long t = dev.villagerreroller.game.GameActions.dayTime(mc);
                 LOGGER.info("VRTEST clock time={} resting={} sleeping={}", t,
                         dev.villagerreroller.logic.DayCycle.villagersResting(t),
@@ -168,7 +178,7 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                 float prog = dev.villagerreroller.game.GameActions.destroyProgress(mc, mc.player, mc.player.blockPosition().below());
                 LOGGER.info("VRTEST break progress/tick={}", prog);
                 mc.gui.setScreen(null);
-            } else if (selftestTicks == 100) {
+            } else if (selftestTicks == 410) {
                 CALIBRATION.begin(mc);
                 LOGGER.info("VRTEST calibration step={}", CALIBRATION.step());
                 CALIBRATION.cancel(mc);
@@ -176,7 +186,7 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                 boolean started = CONTROLLER.start(mc); // must refuse: not calibrated
                 LOGGER.info("VRTEST start-without-calibration refused={}", !started);
                 config.rules.remove("minecraft:mending");
-            } else if (selftestTicks == 110) {
+            } else if (selftestTicks == 420) {
                 LOGGER.info("VRTEST done");
                 selftestTicks = 1000;
             }
