@@ -41,7 +41,7 @@ jobs:
           java-version: 25
       - name: Virtual screen, software OpenGL, launcher
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1 imagemagick libopenal1 pulseaudio > /dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1 imagemagick xdotool libopenal1 pulseaudio > /dev/null
           pip install -q portablemc
       - uses: actions/download-artifact@v4
         with:
