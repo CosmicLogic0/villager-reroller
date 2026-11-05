@@ -1,0 +1,51 @@
+# Records the screenshots and the reroll video for the mod page in a real Minecraft 26.3 game,
+# and pushes them to the "media" branch. Run it from the Actions tab (Run workflow).
+name: Showcase media
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  showcase:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.6.0"
+      - run: gradle build -x test --no-daemon
+      - name: Virtual screen, software OpenGL, launcher, video tools
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1 imagemagick xdotool ffmpeg libopenal1 pulseaudio > /dev/null
+          pip install -q portablemc
+      - name: Play and record
+        run: |
+          jar=$(ls build/libs/*.jar | grep -v -e sources -e dev | head -1)
+          bash tools/ci/showcase.sh "$jar" 26.3 media-out
+      - name: Make the video and GIF
+        run: |
+          cd media-out
+          ls frames | wc -l
+          ffmpeg -loglevel error -y -framerate 6 -pattern_type glob -i 'frames/*.png' -vf "scale=1280:-2" -c:v libx264 -preset veryfast -crf 24 -pix_fmt yuv420p reroll.mp4
+          ffmpeg -loglevel error -y -i reroll.mp4 -vf "fps=6,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" reroll.gif
+          rm -rf frames
+          ls -la
+      - name: Push to the media branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp -r media-out /tmp/media-out
+          git checkout --orphan media
+          git rm -rf . > /dev/null
+          git clean -fdxq
+          cp /tmp/media-out/* .
+          git add -A
+          git commit -m "Showcase media"
+          git push -f origin media
