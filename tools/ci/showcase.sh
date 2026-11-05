@@ -58,6 +58,7 @@ srv "setblock 3 -60 3 poppy"; srv "setblock 1 -60 -2 dandelion"; srv "setblock 0
 srv "setblock 4 -60 0 lectern[facing=west]"
 srv "setblock 5 -61 0 air"
 srv "summon villager 5.5 -61 0.5 {PersistenceRequired:1b}"
+srv "summon villager 6.5 -60 2.5 {NoAI:1b,PersistenceRequired:1b,Rotation:[110f,0f],VillagerData:{profession:\"minecraft:librarian\",level:3,type:\"minecraft:plains\"}}"
 srv "gamemode survival Steve"
 srv "clear Steve"
 srv "give Steve iron_axe 1"
@@ -94,7 +95,7 @@ mod "start"
 n=0; start=$(date +%s)
 while :; do
   n=$((n+1)); import -display :99 -window root "$out/frames/f$(printf %04d $n).png" 2>/dev/null
-  [ "$n" = 40 ] && cp "$out/frames/f0040.png" "$out/running.png"
+  [ "$n" = 18 ] && cp "$out/frames/f0018.png" "$out/running.png"
   grep -q "VRSHOW stopped" game.log && break
   [ $(( $(date +%s) - start )) -gt 330 ] && { mod "stop"; break; }
   sleep 0.35
