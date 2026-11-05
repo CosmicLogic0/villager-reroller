@@ -76,8 +76,8 @@ public final class VillagerRerollerClient implements ClientModInitializer {
         // These Fabric events fire for both the client and (in singleplayer) the integrated server.
         // Calibration ignores everything that isn't the local player.
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
-            CALIBRATION.onUseBlock(player, hand, hit);
-            return InteractionResult.PASS;
+            // FAIL = swallow the click (so recording your bed during the day doesn't try to sleep)
+            return CALIBRATION.onUseBlock(player, level, hand, hit) ? InteractionResult.FAIL : InteractionResult.PASS;
         });
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
             CALIBRATION.onUseEntity(player, entity);
@@ -104,6 +104,16 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                                     CALIBRATION.begin(Minecraft.getInstance());
                                     return 1;
                                 }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("setbed")
+                                .executes(ctx -> {
+                                    CALIBRATION.askForBed(Minecraft.getInstance());
+                                    return 1;
+                                }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("skipbed")
+                                .executes(ctx -> {
+                                    CALIBRATION.skipBed(Minecraft.getInstance());
+                                    return 1;
+                                }))
                         .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("start")
                                 .executes(ctx -> {
                                     CONTROLLER.start(Minecraft.getInstance());
@@ -125,6 +135,7 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                                 .executes(ctx -> {
                                     Minecraft mc = Minecraft.getInstance();
                                     Msg.info(mc, "Calibrated: " + CALIBRATION.isDone()
+                                            + " | bed: " + (CALIBRATION.hasBed() ? "set" : "not set")
                                             + " | running: " + CONTROLLER.isRunning()
                                             + " | rerolls: " + CONTROLLER.rerolls()
                                             + (CONTROLLER.lastSummary().isEmpty() ? "" : " | last: " + CONTROLLER.lastSummary()));
@@ -149,6 +160,13 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                 boolean open = mc.gui.screen() instanceof RerollerScreen;
                 int enchants = dev.villagerreroller.game.EnchantCatalog.tradeable(mc).size();
                 LOGGER.info("VRTEST menu open={} enchants={}", open, enchants);
+                long t = dev.villagerreroller.game.GameActions.dayTime(mc);
+                LOGGER.info("VRTEST clock time={} resting={} sleeping={}", t,
+                        dev.villagerreroller.logic.DayCycle.villagersResting(t),
+                        dev.villagerreroller.game.GameActions.isSleeping(mc.player));
+                dev.villagerreroller.game.GameActions.releaseMovement(mc);
+                float prog = dev.villagerreroller.game.GameActions.destroyProgress(mc, mc.player, mc.player.blockPosition().below());
+                LOGGER.info("VRTEST break progress/tick={}", prog);
                 mc.gui.setScreen(null);
             } else if (selftestTicks == 100) {
                 CALIBRATION.begin(mc);
