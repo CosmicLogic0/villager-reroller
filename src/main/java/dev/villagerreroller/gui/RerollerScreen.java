@@ -4,48 +4,79 @@ import dev.villagerreroller.VillagerRerollerClient;
 import dev.villagerreroller.config.ConfigIO;
 import dev.villagerreroller.game.EnchantCatalog;
 import dev.villagerreroller.logic.EnchantGroups;
+import dev.villagerreroller.logic.EnchantInfo;
 import dev.villagerreroller.logic.EnchantRule;
 import dev.villagerreroller.logic.PriceCalc;
 import dev.villagerreroller.logic.RerollerConfig;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
 /**
- * The settings menu.
+ * The settings menu: one dark panel, drawn by hand so it can look modern.
  *
- *   [Calibrate] [Set bed] [Night: ON] [Start] [Done]
- *   [Accept any: OFF] [-] Max 150% [+]   [Max rerolls: 500]
- *   [search........] [Show: All] [Want all] [Avoid all] [Clear]     <- act on everything listed
- *   SWORDS & AXES                 [Want all] [Avoid all] [Clear]     <- act on that group
- *     Sharpness  [Want]  [Max lvl]  [-] 150% (<=25) [+]
- *     ...
+ *   [book] Villager Reroller                         [Start] [x]
+ *          * Calibrated. Ready.
+ *   [Calibrate] [Bed] [Night] [Sounds] [Accept any]
+ *   [search......] [Show: All] [Want all] [Avoid all] [Clear]
+ *   v [sword] Swords & Axes                    2 wanted   7
+ *       [icon] Sharpness     [Want] [Max V]  - 150% [emerald] 25 +
+ *   > [pick]  Tools                                        3
+ *   ...
+ *   40 enchants . 2 wanted . 1 avoided           Expand all . Collapse all
  *
- * Text is drawn with GuiGraphicsExtractor.text (the 26.x way); the list is paged by hand.
+ * Everything is drawn each frame and the clickable areas are remembered as "zones"; only the search
+ * box is a real vanilla widget. Hovering an enchant shows what it does and its prices.
  */
 public final class RerollerScreen extends Screen {
 
-    private static final int ROW_H = 22;
-    private static final int[] MAX_REROLL_CHOICES = {100, 250, 500, 1000, 5000, 0};
-
-    private static final int WHITE = 0xFFFFFFFF;
-    private static final int GOLD = 0xFFFFD75A;
-    private static final int GREEN = 0xFF55E055;
-    private static final int RED = 0xFFFF6060;
-    private static final int GRAY = 0xFF9A9A9A;
+    // ---- palette (ARGB)
+    private static final int SHADOW = 0x66000000;
+    private static final int PANEL = 0xF2111419;
+    private static final int EDGE = 0xFF2B3340;
+    private static final int HEADER = 0xFF161B22;
+    private static final int BTN = 0xFF232A34;
+    private static final int BTN_HOVER = 0xFF2F3846;
+    private static final int TEXT = 0xFFE8EDF2;
+    private static final int MUTED = 0xFF8B96A5;
+    private static final int DIM = 0xFF5D6774;
+    private static final int GOLD = 0xFFFFC857;
+    private static final int GREEN = 0xFF4ADE80;
+    private static final int GREEN_BG = 0xFF1B4630;
+    private static final int GREEN_BG_HOVER = 0xFF23583C;
+    private static final int RED = 0xFFF87171;
+    private static final int RED_BG = 0xFF4A1C21;
+    private static final int RED_BG_HOVER = 0xFF5C242A;
+    private static final int YELLOW = 0xFFFFE27A;
     private static final int ORANGE = 0xFFFFB050;
-    private static final int YELLOW = 0xFFFFE066;
-    private static final int AQUA = 0xFF6FD3FF;
+    private static final int ROW_HOVER = 0x1FFFFFFF;
+    private static final int GROUP_BG = 0xFF19202A;
+    private static final int GROUP_BG_HOVER = 0xFF222A36;
+    private static final int TRACK = 0xFF1A2029;
+    private static final int THUMB = 0xFF465263;
+
+    private static final int ROW_H = 20;
+
+    /** Which sections are open. Remembered while the game is running. */
+    private static final EnumSet<EnchantGroups.Group> EXPANDED = EnumSet.noneOf(EnchantGroups.Group.class);
 
     private enum Filter {
         ALL("All"), WANTED("Wanted"), AVOIDED("Avoided");
@@ -60,21 +91,38 @@ public final class RerollerScreen extends Screen {
         }
     }
 
-    /** A piece of text to draw after the widgets: position, width to fit into, colour, centred or left. */
-    private record Label(int x, int y, int w, String text, int color, boolean center) {
+    private enum Style { NORMAL, PRIMARY, DANGER, WANT, AVOID }
+
+    private interface Click {
+        void run(int button);
     }
 
-    /** One line of the list: either a group heading or an enchantment. */
+    /** A clickable and/or hoverable rectangle from the last frame. */
+    private record Zone(int x0, int y0, int x1, int y1, Click click, List<Component> tooltip) {
+        boolean hit(double x, double y) {
+            return x >= x0 && x < x1 && y >= y0 && y < y1;
+        }
+    }
+
+    /** One line of the list: a section heading or an enchantment. */
     private record Line(EnchantGroups.Group header, EnchantCatalog.Entry entry) {
     }
 
-    private final List<Label> labels = new ArrayList<>();
+    private final List<Zone> zones = new ArrayList<>();
+    private final Map<String, ItemStack> icons = new HashMap<>();
     private List<EnchantCatalog.Entry> catalog = List.of();
-    private int page;
-    private Filter filter = Filter.ALL;
+    private EditBox searchBox;
     private String search = "";
-    private boolean searchFocused;
-    private boolean rebuildPending;
+    private Filter filter = Filter.ALL;
+    private int scroll;
+
+    // panel geometry, set by layout()
+    private int px, py, pw, ph, ix, iw, toolbarY, filterY, listTop, listBottom;
+
+    /** CI screenshots only. */
+    public static void expandForTest(EnchantGroups.Group... groups) {
+        EXPANDED.addAll(List.of(groups));
+    }
 
     public RerollerScreen() {
         super(Component.literal("Villager Reroller"));
@@ -84,188 +132,551 @@ public final class RerollerScreen extends Screen {
         return VillagerRerollerClient.config;
     }
 
+    // ------------------------------------------------------------------ setup
+
+    private void layout() {
+        pw = Math.min(400, this.width - 12);
+        ph = this.height - 12;
+        px = (this.width - pw) / 2;
+        py = 6;
+        ix = px + 8;
+        iw = pw - 16;
+        toolbarY = py + 37;
+        filterY = py + 59;
+        listTop = py + 83;
+        listBottom = py + ph - 18;
+    }
+
     @Override
     protected void init() {
-        labels.clear();
-        Minecraft mc = Minecraft.getInstance();
+        catalog = EnchantCatalog.tradeable(Minecraft.getInstance());
+        layout();
+        int searchW = Math.max(60, iw - (62 + 58 + 58 + 48 + 4 * 6));
+        searchBox = new EditBox(this.font, ix, filterY, searchW, 18, Component.literal("Search"));
+        searchBox.setMaxLength(40);
+        searchBox.setHint(Component.literal("Search enchants...").withStyle(ChatFormatting.DARK_GRAY));
+        searchBox.setValue(search);
+        searchBox.setResponder(s -> {
+            if (!s.equals(search)) {
+                search = s;
+                scroll = 0;
+            }
+        });
+        addRenderableWidget(searchBox);
+    }
+
+    // ------------------------------------------------------------------ drawing
+
+    @Override
+    public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
+        super.extractBackground(g, mouseX, mouseY, delta);
+        layout();
+        g.fill(px + 2, py + 3, px + pw + 2, py + ph + 3, SHADOW);
+        g.fill(px, py, px + pw, py + ph, PANEL);
+        g.fill(px, py, px + pw, py + 31, HEADER);
+        g.fill(px, py + 31, px + pw, py + 32, EDGE);
+        g.fill(px, listBottom + 1, px + pw, listBottom + 2, EDGE);
+        g.fill(px, py, px + pw, py + 1, EDGE);
+        g.fill(px, py + ph - 1, px + pw, py + ph, EDGE);
+        g.fill(px, py, px + 1, py + ph, EDGE);
+        g.fill(px + pw - 1, py, px + pw, py + ph, EDGE);
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
+        zones.clear();
+        layout();
+        super.extractRenderState(g, mouseX, mouseY, delta);
         RerollerConfig cfg = cfg();
-        catalog = EnchantCatalog.tradeable(mc);
-        int left = this.width / 2 - 180;
 
-        // ---- title + status
-        label(left, 6, 360, "Villager Reroller", GOLD, true);
-        label(left, 18, 360, statusText(), statusColor(), true);
+        drawHeader(g, mouseX, mouseY);
+        drawToolbar(g, mouseX, mouseY, cfg);
+        List<EnchantCatalog.Entry> shown = shownEntries(cfg);
+        drawFilterRow(g, mouseX, mouseY, cfg, shown);
+        drawList(g, mouseX, mouseY, cfg, shown);
+        drawFooter(g, mouseX, mouseY, cfg);
 
-        // ---- row 1: main buttons
-        int y = 30;
-        addRenderableWidget(Button.builder(Component.literal("Calibrate"), b -> {
-            saveAndClose();
-            VillagerRerollerClient.CALIBRATION.begin(mc);
-        }).bounds(left, y, 68, 20).build());
+        for (int i = zones.size() - 1; i >= 0; i--) {
+            Zone z = zones.get(i);
+            if (z.hit(mouseX, mouseY)) {
+                if (z.tooltip() != null) {
+                    g.setComponentTooltipForNextFrame(this.font, z.tooltip(), mouseX, mouseY);
+                }
+                break;
+            }
+        }
+    }
 
-        Button bed = Button.builder(Component.literal(VillagerRerollerClient.CALIBRATION.hasBed() ? "Bed: set" : "Set bed"), b -> {
-            saveAndClose();
-            VillagerRerollerClient.CALIBRATION.askForBed(mc);
-        }).bounds(left + 73, y, 68, 20).build();
-        bed.active = VillagerRerollerClient.CALIBRATION.isDone();
-        addRenderableWidget(bed);
+    private void drawHeader(GuiGraphicsExtractor g, int mx, int my) {
+        g.item(icon(EnchantInfo.FALLBACK_ICON), px + 8, py + 7);
+        g.text(this.font, "Villager Reroller", px + 30, py + 6, GOLD, true);
+        int sc = statusColor();
+        g.fill(px + 30, py + 20, px + 34, py + 24, sc);
+        g.text(this.font, fit(statusText(), pw - 140), px + 38, py + 18, MUTED, false);
 
-        addRenderableWidget(Button.builder(
-                Component.literal("Night: " + (cfg.handleNight ? "ON" : "OFF")),
-                b -> {
-                    cfg.handleNight = !cfg.handleNight;
-                    rebuildWidgets();
-                }).bounds(left + 146, y, 68, 20).build());
+        // close
+        int cx = px + pw - 26;
+        int cy = py + 6;
+        boolean hoverClose = mx >= cx && mx < cx + 18 && my >= cy && my < cy + 18;
+        g.fill(cx, cy, cx + 18, cy + 18, hoverClose ? RED_BG_HOVER : BTN);
+        for (int i = 0; i < 7; i++) {
+            g.fill(cx + 5 + i, cy + 5 + i, cx + 6 + i, cy + 6 + i, TEXT);
+            g.fill(cx + 11 - i, cy + 5 + i, cx + 12 - i, cy + 6 + i, TEXT);
+        }
+        zones.add(new Zone(cx, cy, cx + 18, cy + 18, b -> onClose(), List.of(Component.literal("Save and close (Esc)"))));
 
+        // start / stop
+        Minecraft mc = Minecraft.getInstance();
         boolean running = VillagerRerollerClient.CONTROLLER.isRunning();
-        addRenderableWidget(Button.builder(
-                Component.literal(running ? "Stop" : "Start").withStyle(running ? ChatFormatting.RED : ChatFormatting.GREEN),
+        button(g, mx, my, cx - 70, cy, 64, 18, running ? "Stop" : "Start", running ? Style.DANGER : Style.PRIMARY, true,
                 b -> {
                     if (VillagerRerollerClient.CONTROLLER.isRunning()) {
                         VillagerRerollerClient.CONTROLLER.stop(mc, "stopped from the menu.", false);
-                        rebuildWidgets();
                     } else {
                         saveAndClose();
                         VillagerRerollerClient.CONTROLLER.start(mc);
                     }
-                }).bounds(left + 219, y, 68, 20).build());
+                },
+                tip(running ? "Stop rerolling" : "Start rerolling", "Shortcut: the toggle key (B) or /vr start"));
+    }
 
-        addRenderableWidget(Button.builder(Component.literal("Done"), b -> onClose())
-                .bounds(left + 292, y, 68, 20).build());
+    private void drawToolbar(GuiGraphicsExtractor g, int mx, int my, RerollerConfig cfg) {
+        Minecraft mc = Minecraft.getInstance();
+        var cal = VillagerRerollerClient.CALIBRATION;
+        int bw = (iw - 4 * 6) / 5;
+        int x = ix;
+        int y = toolbarY;
 
-        // ---- row 2: global options
-        y = 54;
-        addRenderableWidget(Button.builder(
-                Component.literal("Accept any: " + (cfg.acceptAnyNotAvoided ? "ON" : "OFF")),
-                b -> {
-                    cfg.acceptAnyNotAvoided = !cfg.acceptAnyNotAvoided;
-                    rebuildWidgets();
-                }).bounds(left, y, 140, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("-"), b -> {
-            cfg.anyMaxPercent = stepDown(cfg.anyMaxPercent);
-            rebuildWidgets();
-        }).bounds(left + 144, y, 20, 20).build());
-        label(left + 166, y + 6, 52, "Max " + cfg.anyMaxPercent + "%", WHITE, true);
-        addRenderableWidget(Button.builder(Component.literal("+"), b -> {
-            cfg.anyMaxPercent = stepUp(cfg.anyMaxPercent);
-            rebuildWidgets();
-        }).bounds(left + 220, y, 20, 20).build());
-        addRenderableWidget(Button.builder(
-                Component.literal("Max rerolls: " + (cfg.maxRerolls == 0 ? "no limit" : cfg.maxRerolls)),
-                b -> {
-                    cfg.maxRerolls = nextRerollLimit(cfg.maxRerolls);
-                    rebuildWidgets();
-                }).bounds(left + 244, y, 116, 20).build());
+        button(g, mx, my, x, y, bw, 18, "Calibrate", Style.NORMAL, true, b -> {
+            saveAndClose();
+            cal.begin(mc);
+        }, tip("Calibrate", "Do the routine once by hand (place the lectern,", "click the villager, break the lectern, click", "your bed) and the mod copies it."));
+        x += bw + 6;
 
-        // ---- row 3: search, filter and "everything listed" shortcuts
-        y = 78;
-        EditBox box = new EditBox(this.font, left, y, 140, 20, Component.literal("Search"));
-        box.setMaxLength(40);
-        box.setHint(Component.literal("Search enchants...").withStyle(ChatFormatting.DARK_GRAY));
-        box.setValue(search);
-        box.setResponder(s -> {
-            if (!s.equals(search)) {
-                search = s;
-                page = 0;
-                searchFocused = true;
-                rebuildPending = true;
-            }
-        });
-        addRenderableWidget(box);
-        if (searchFocused) {
-            this.setFocused(box);
-            box.setFocused(true);
+        toggle(g, mx, my, x, y, bw, cal.hasBed() ? "Bed set" : "Set bed", cal.hasBed(), cal.isDone(), b -> {
+            saveAndClose();
+            cal.askForBed(mc);
+        }, cal.isDone()
+                ? tip(cal.hasBed() ? "Change bed" : "Set bed", "Right-click the bed to sleep in at night.", "Keep it a few blocks from where you stand.")
+                : tip("Set bed", "Calibrate first."));
+        x += bw + 6;
+
+        toggle(g, mx, my, x, y, bw, "Night", cfg.handleNight, true, b -> cfg.handleNight = !cfg.handleNight,
+                tip("Night handling: " + (cfg.handleNight ? "ON" : "OFF"), "Villagers sleep instead of taking jobs at night.",
+                        "When on: sleep in your bed (or wait for morning),", "then walk back to your spot and carry on."));
+        x += bw + 6;
+
+        toggle(g, mx, my, x, y, bw, "Sounds", cfg.sounds, true, b -> cfg.sounds = !cfg.sounds,
+                tip("Sounds: " + (cfg.sounds ? "ON" : "OFF"), "A chime when rerolling starts, a low note when it", "stops, and a fanfare when your book is found."));
+        x += bw + 6;
+
+        toggle(g, mx, my, x, y, iw - (x - ix), "Accept any", cfg.acceptAnyNotAvoided, true,
+                b -> cfg.acceptAnyNotAvoided = !cfg.acceptAnyNotAvoided,
+                tip("Accept any: " + (cfg.acceptAnyNotAvoided ? "ON" : "OFF"), "Stop on any enchant you haven't marked Avoid,",
+                        "as long as it's within that enchant's own price limit."));
+    }
+
+    private void drawFilterRow(GuiGraphicsExtractor g, int mx, int my, RerollerConfig cfg, List<EnchantCatalog.Entry> shown) {
+        int x = ix + searchBox.getWidth() + 6;
+        int y = filterY;
+        List<String> shownIds = ids(shown);
+
+        button(g, mx, my, x, y, 62, 18, "Show: " + filter.label, Style.NORMAL, true, b -> {
+            filter = b == 1 ? Filter.values()[(filter.ordinal() + 2) % 3] : filter.next();
+            scroll = 0;
+        }, tip("Show", "All, only Wanted, or only Avoided enchants."));
+        x += 68;
+        button(g, mx, my, x, y, 58, 18, "Want all", Style.WANT, !shownIds.isEmpty(),
+                b -> EnchantGroups.setAll(cfg, shownIds, EnchantRule.Mode.WANT),
+                tip("Want all", "Sets every enchant in the list to Want.", "Works with the search and Show filter."));
+        x += 64;
+        button(g, mx, my, x, y, 58, 18, "Avoid all", Style.AVOID, !shownIds.isEmpty(),
+                b -> EnchantGroups.setAll(cfg, shownIds, EnchantRule.Mode.AVOID),
+                tip("Avoid all", "Sets every enchant in the list to Avoid.", "Works with the search and Show filter."));
+        x += 64;
+        button(g, mx, my, x, y, ix + iw - x, 18, "Clear", Style.NORMAL, !shownIds.isEmpty(),
+                b -> EnchantGroups.setAll(cfg, shownIds, EnchantRule.Mode.IGNORE),
+                tip("Clear", "Sets every enchant in the list back to Ignore."));
+    }
+
+    private void drawList(GuiGraphicsExtractor g, int mx, int my, RerollerConfig cfg, List<EnchantCatalog.Entry> shown) {
+        if (catalog.isEmpty()) {
+            centered(g, "Join a world to load the enchantment list.", listTop + 12, ORANGE);
+            return;
+        }
+        if (shown.isEmpty()) {
+            centered(g, "Nothing matches.", listTop + 12, MUTED);
+            return;
         }
 
-        addRenderableWidget(Button.builder(Component.literal("Show: " + filter.label), b -> {
-            filter = filter.next();
-            page = 0;
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 144, y, 70, 20).build());
-
-        List<EnchantCatalog.Entry> shown = shownEntries(cfg);
-        List<String> shownIds = ids(shown);
-        addRenderableWidget(Button.builder(Component.literal("Want all").withStyle(ChatFormatting.GREEN), b -> {
-            EnchantGroups.setAll(cfg, shownIds, EnchantRule.Mode.WANT);
-            rebuildWidgets();
-        }).bounds(left + 218, y, 46, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Avoid all").withStyle(ChatFormatting.RED), b -> {
-            EnchantGroups.setAll(cfg, shownIds, EnchantRule.Mode.AVOID);
-            rebuildWidgets();
-        }).bounds(left + 268, y, 48, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("Clear"), b -> {
-            EnchantGroups.setAll(cfg, shownIds, EnchantRule.Mode.IGNORE);
-            rebuildWidgets();
-        }).bounds(left + 320, y, 40, 20).build());
-
-        // ---- the grouped list
         Map<EnchantGroups.Group, List<EnchantCatalog.Entry>> byGroup = new EnumMap<>(EnchantGroups.Group.class);
         for (EnchantCatalog.Entry e : shown) {
-            byGroup.computeIfAbsent(EnchantGroups.of(e.id()), g -> new ArrayList<>()).add(e);
+            byGroup.computeIfAbsent(EnchantGroups.of(e.id()), k -> new ArrayList<>()).add(e);
         }
+        boolean filtering = !search.isBlank() || filter != Filter.ALL; // open every section while searching
         List<Line> lines = new ArrayList<>();
-        for (Map.Entry<EnchantGroups.Group, List<EnchantCatalog.Entry>> g : byGroup.entrySet()) {
-            lines.add(new Line(g.getKey(), null));
-            for (EnchantCatalog.Entry e : g.getValue()) {
-                lines.add(new Line(null, e));
+        for (Map.Entry<EnchantGroups.Group, List<EnchantCatalog.Entry>> grp : byGroup.entrySet()) {
+            lines.add(new Line(grp.getKey(), null));
+            if (filtering || EXPANDED.contains(grp.getKey())) {
+                for (EnchantCatalog.Entry e : grp.getValue()) {
+                    lines.add(new Line(null, e));
+                }
             }
         }
 
-        int top = 104;
-        int rowsPerPage = Math.max(3, (this.height - top - 30) / ROW_H);
-        int pages = Math.max(1, (lines.size() + rowsPerPage - 1) / rowsPerPage);
-        page = Math.max(0, Math.min(page, pages - 1));
+        int visible = Math.max(1, (listBottom - listTop) / ROW_H);
+        int maxScroll = Math.max(0, lines.size() - visible);
+        scroll = Math.max(0, Math.min(scroll, maxScroll));
+        int right = ix + iw - 8;
 
-        if (catalog.isEmpty()) {
-            label(left, top + 8, 360, "Join a world to load the enchantment list.", ORANGE, true);
-        } else if (lines.isEmpty()) {
-            label(left, top + 8, 360, "Nothing matches.", GRAY, true);
-        }
-
-        int from = page * rowsPerPage;
-        int to = Math.min(lines.size(), from + rowsPerPage);
-        for (int i = from; i < to; i++) {
-            int rowY = top + (i - from) * ROW_H;
+        for (int i = scroll; i < Math.min(lines.size(), scroll + visible); i++) {
+            int y = listTop + (i - scroll) * ROW_H;
             Line line = lines.get(i);
             if (line.header() != null) {
-                addHeader(left, rowY, line.header(), ids(byGroup.get(line.header())), cfg);
+                drawHeaderLine(g, mx, my, y, right, line.header(), byGroup.get(line.header()), cfg, filtering);
             } else {
-                addRow(left, rowY, line.entry(), cfg);
+                drawEntry(g, mx, my, y, right, line.entry(), cfg);
             }
         }
 
-        // ---- paging
-        int by = this.height - 24;
-        Button prev = Button.builder(Component.literal("< Prev"), b -> {
-            page--;
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left, by, 80, 20).build();
-        prev.active = page > 0;
-        addRenderableWidget(prev);
-
-        label(left + 80, by + 6, 200, "Page " + (page + 1) + " / " + pages + "   (" + shown.size() + " enchants)", WHITE, true);
-
-        Button next = Button.builder(Component.literal("Next >"), b -> {
-            page++;
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 280, by, 80, 20).build();
-        next.active = page < pages - 1;
-        addRenderableWidget(next);
+        // scrollbar
+        int tx = ix + iw - 4;
+        g.fill(tx, listTop, tx + 4, listTop + visible * ROW_H, TRACK);
+        if (maxScroll > 0) {
+            int trackH = visible * ROW_H;
+            int thumbH = Math.max(14, trackH * visible / lines.size());
+            int thumbY = listTop + (trackH - thumbH) * scroll / maxScroll;
+            g.fill(tx, thumbY, tx + 4, thumbY + thumbH, THUMB);
+        }
     }
+
+    private void drawHeaderLine(GuiGraphicsExtractor g, int mx, int my, int y, int right, EnchantGroups.Group group,
+                                List<EnchantCatalog.Entry> entries, RerollerConfig cfg, boolean filtering) {
+        boolean open = filtering || EXPANDED.contains(group);
+        boolean hover = mx >= ix && mx < right && my >= y && my < y + ROW_H;
+        g.fill(ix, y + 1, right, y + ROW_H - 1, hover ? GROUP_BG_HOVER : GROUP_BG);
+        chevron(g, ix + 5, y + 7, open, hover ? TEXT : MUTED);
+        g.item(icon(EnchantInfo.groupIcon(group)), ix + 16, y + 2);
+        g.text(this.font, group.title, ix + 37, y + 6, TEXT, true);
+
+        int wanted = 0;
+        int avoided = 0;
+        for (EnchantCatalog.Entry e : entries) {
+            EnchantRule.Mode m = mode(cfg, e.id());
+            if (m == EnchantRule.Mode.WANT) {
+                wanted++;
+            } else if (m == EnchantRule.Mode.AVOID) {
+                avoided++;
+            }
+        }
+        int x = right - 6;
+        String total = String.valueOf(entries.size());
+        x -= this.font.width(total);
+        g.text(this.font, total, x, y + 6, DIM, false);
+        if (avoided > 0) {
+            String s = avoided + " avoided";
+            x -= this.font.width(s) + 10;
+            g.text(this.font, s, x, y + 6, RED, false);
+        }
+        if (wanted > 0) {
+            String s = wanted + " wanted";
+            x -= this.font.width(s) + 10;
+            g.text(this.font, s, x, y + 6, GREEN, false);
+        }
+        zones.add(new Zone(ix, y, right, y + ROW_H, b -> {
+            if (EXPANDED.contains(group)) {
+                EXPANDED.remove(group);
+            } else {
+                EXPANDED.add(group);
+            }
+        }, filtering ? null : List.of(Component.literal(open ? "Click to collapse" : "Click to expand").withStyle(ChatFormatting.GRAY))));
+    }
+
+    private void drawEntry(GuiGraphicsExtractor g, int mx, int my, int y, int right, EnchantCatalog.Entry e, RerollerConfig cfg) {
+        EnchantRule existing = cfg.ruleOrNull(e.id());
+        EnchantRule rule = existing != null ? existing : new EnchantRule();
+        EnchantRule.Mode mode = rule.mode;
+        boolean priceActive = mode == EnchantRule.Mode.WANT || (cfg.acceptAnyNotAvoided && mode == EnchantRule.Mode.IGNORE);
+        int level = rule.requiredLevel(e.maxLevel());
+        int best = PriceCalc.bestPrice(cfg.priceModel, level, e.doublePrice());
+        int limit = PriceCalc.priceLimit(best, rule.maxPercent);
+
+        boolean hover = mx >= ix && mx < right && my >= y && my < y + ROW_H;
+        if (hover) {
+            g.fill(ix, y, right, y + ROW_H, ROW_HOVER);
+        }
+        if (mode != EnchantRule.Mode.IGNORE) {
+            g.fill(ix + 12, y + 3, ix + 14, y + ROW_H - 3, mode == EnchantRule.Mode.WANT ? GREEN : RED);
+        }
+        g.item(icon(EnchantInfo.icon(e.id())), ix + 18, y + 2);
+
+        // the whole row shows the enchant's details; controls added after it win the hover
+        zones.add(new Zone(ix, y, right, y + ROW_H, null, entryTooltip(e, rule, priceActive, best, limit, level)));
+
+        int r = right - 4;
+        int modeX = r - 182;
+        int nameColor = switch (mode) {
+            case WANT -> GREEN;
+            case AVOID -> RED;
+            case IGNORE -> TEXT;
+        };
+        g.text(this.font, fit(e.name().getString(), modeX - 6 - (ix + 39)), ix + 39, y + 6, nameColor, true);
+
+        // mode chip: left click forward, right click back
+        Style ms = mode == EnchantRule.Mode.WANT ? Style.WANT : mode == EnchantRule.Mode.AVOID ? Style.AVOID : Style.NORMAL;
+        String ml = mode == EnchantRule.Mode.WANT ? "Want" : mode == EnchantRule.Mode.AVOID ? "Avoid" : "Ignore";
+        button(g, mx, my, modeX, y + 2, 42, 16, ml, ms, true, b -> {
+            EnchantRule rr = cfg.rule(e.id());
+            rr.mode = b == 1 ? EnchantRule.Mode.values()[(rr.mode.ordinal() + 2) % 3] : rr.mode.next();
+        }, tip("Ignore / Want / Avoid", "Want: stop when it's offered.", "Avoid: never accept a villager offering it.", "Click to change (right-click goes back)."));
+
+        // level chip
+        boolean levelActive = mode == EnchantRule.Mode.WANT && e.maxLevel() > 1;
+        String lvl = e.maxLevel() <= 1 ? "I" : rule.minLevel <= 0 ? "Max " + EnchantInfo.roman(e.maxLevel())
+                : EnchantInfo.roman(level) + "+";
+        button(g, mx, my, r - 136, y + 2, 36, 16, lvl, Style.NORMAL, levelActive, b -> {
+            EnchantRule rr = cfg.rule(e.id());
+            rr.minLevel = b == 1 ? prevMinLevel(rr.minLevel, e.maxLevel()) : nextMinLevel(rr.minLevel, e.maxLevel());
+        }, e.maxLevel() <= 1 ? tip("Level", "This enchant only has one level.")
+                : tip("Lowest level you'll accept", "Max " + EnchantInfo.roman(e.maxLevel()) + " = only the best level.", "Click to change (right-click goes back)."));
+
+        // price: [-] 150% [emerald] 25 [+]
+        g.item(icon("minecraft:emerald"), r - 52, y + 2);
+        if (priceActive) {
+            button(g, mx, my, r - 96, y + 3, 14, 14, "-", Style.NORMAL, rule.maxPercent > 100, b -> {
+                EnchantRule rr = cfg.rule(e.id());
+                rr.maxPercent = stepDown(rr.maxPercent);
+            }, null);
+            String pct = rule.maxPercent + "%";
+            g.text(this.font, pct, r - 67 - this.font.width(pct) / 2, y + 6, YELLOW, false);
+            g.text(this.font, String.valueOf(limit), r - 34, y + 6, GREEN, true);
+            button(g, mx, my, r - 14, y + 3, 14, 14, "+", Style.NORMAL, rule.maxPercent < 1000, b -> {
+                EnchantRule rr = cfg.rule(e.id());
+                rr.maxPercent = stepUp(rr.maxPercent);
+            }, null);
+            zones.add(new Zone(r - 82, y, r - 16, y + ROW_H, null,
+                    tip("Price limit: " + limit + " emeralds", rule.maxPercent + "% of the cheapest possible price (" + best + ").",
+                            "100% = only the cheapest roll. Use - and + to change.")));
+        } else {
+            g.text(this.font, "best", r - 67 - this.font.width("best") / 2, y + 6, DIM, false);
+            g.text(this.font, String.valueOf(best), r - 34, y + 6, MUTED, false);
+            zones.add(new Zone(r - 82, y, r, y + ROW_H, null,
+                    tip("Cheapest possible: " + best + " emeralds", "Set this enchant to Want to choose your price limit.")));
+        }
+    }
+
+    private void drawFooter(GuiGraphicsExtractor g, int mx, int my, RerollerConfig cfg) {
+        int wanted = 0;
+        int avoided = 0;
+        for (EnchantCatalog.Entry e : catalog) {
+            EnchantRule.Mode m = mode(cfg, e.id());
+            if (m == EnchantRule.Mode.WANT) {
+                wanted++;
+            } else if (m == EnchantRule.Mode.AVOID) {
+                avoided++;
+            }
+        }
+        int y = listBottom + 6;
+        g.text(this.font, catalog.size() + " enchants  ·  ", ix, y, MUTED, false);
+        int x = ix + this.font.width(catalog.size() + " enchants  ·  ");
+        g.text(this.font, wanted + " wanted", x, y, wanted > 0 ? GREEN : MUTED, false);
+        x += this.font.width(wanted + " wanted  ·  ");
+        g.text(this.font, "  ·  ", x - this.font.width("  ·  "), y, MUTED, false);
+        g.text(this.font, avoided + " avoided", x, y, avoided > 0 ? RED : MUTED, false);
+
+        int rx = ix + iw;
+        rx = link(g, mx, my, rx, y, "Collapse all", b -> EXPANDED.clear());
+        rx -= this.font.width("  ·  ");
+        g.text(this.font, "  ·  ", rx, y, DIM, false);
+        link(g, mx, my, rx, y, "Expand all", b -> EXPANDED.addAll(EnumSet.allOf(EnchantGroups.Group.class)));
+    }
+
+    // ------------------------------------------------------------------ small drawing helpers
+
+    private void button(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h, String label, Style style,
+                        boolean enabled, Click click, List<Component> tooltip) {
+        boolean hover = enabled && mx >= x && mx < x + w && my >= y && my < y + h;
+        int bg;
+        int fg;
+        switch (style) {
+            case PRIMARY -> {
+                bg = hover ? 0xFF2FB765 : 0xFF22A055;
+                fg = 0xFFFFFFFF;
+            }
+            case DANGER -> {
+                bg = hover ? 0xFFE0464E : 0xFFC9363E;
+                fg = 0xFFFFFFFF;
+            }
+            case WANT -> {
+                bg = hover ? GREEN_BG_HOVER : GREEN_BG;
+                fg = GREEN;
+            }
+            case AVOID -> {
+                bg = hover ? RED_BG_HOVER : RED_BG;
+                fg = RED;
+            }
+            default -> {
+                bg = hover ? BTN_HOVER : BTN;
+                fg = TEXT;
+            }
+        }
+        if (!enabled) {
+            bg = BTN;
+            fg = DIM;
+        }
+        g.fill(x, y, x + w, y + h, bg);
+        g.fill(x, y, x + w, y + 1, 0x14FFFFFF);
+        String s = fit(label, w - 4);
+        g.text(this.font, s, x + (w - this.font.width(s)) / 2, y + (h - 8) / 2, fg, style == Style.PRIMARY || style == Style.DANGER);
+        zones.add(new Zone(x, y, x + w, y + h, enabled ? click : null, tooltip));
+    }
+
+    /** A button with a little on/off light on the left. */
+    private void toggle(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, String label, boolean on,
+                        boolean enabled, Click click, List<Component> tooltip) {
+        boolean hover = enabled && mx >= x && mx < x + w && my >= y && my < y + 18;
+        int bg = !enabled ? BTN : on ? (hover ? GREEN_BG_HOVER : GREEN_BG) : (hover ? BTN_HOVER : BTN);
+        g.fill(x, y, x + w, y + 18, bg);
+        g.fill(x, y, x + w, y + 1, 0x14FFFFFF);
+        g.fill(x + 6, y + 7, x + 10, y + 11, !enabled ? DIM : on ? GREEN : DIM);
+        String s = fit(label, w - 18);
+        g.text(this.font, s, x + 14 + (w - 18 - this.font.width(s)) / 2, y + 5, !enabled ? DIM : on ? GREEN : TEXT, false);
+        zones.add(new Zone(x, y, x + w, y + 18, enabled ? click : null, tooltip));
+    }
+
+    /** Right-aligned clickable text ending at {@code right}; returns its left edge. */
+    private int link(GuiGraphicsExtractor g, int mx, int my, int right, int y, String text, Click click) {
+        int w = this.font.width(text);
+        int x = right - w;
+        boolean hover = mx >= x && mx < right && my >= y - 2 && my < y + 10;
+        g.text(this.font, text, x, y, hover ? TEXT : MUTED, false);
+        if (hover) {
+            g.fill(x, y + 9, right, y + 10, TEXT);
+        }
+        zones.add(new Zone(x, y - 2, right, y + 10, click, null));
+        return x;
+    }
+
+    /** A small triangle: pointing right (closed) or down (open). */
+    private static void chevron(GuiGraphicsExtractor g, int x, int y, boolean open, int color) {
+        if (open) {
+            for (int i = 0; i < 4; i++) {
+                g.fill(x + i, y + 1 + i, x + 7 - i, y + 2 + i, color);
+            }
+        } else {
+            for (int i = 0; i < 4; i++) {
+                g.fill(x + 1 + i, y + i, x + 2 + i, y + 7 - i, color);
+            }
+        }
+    }
+
+    private void centered(GuiGraphicsExtractor g, String s, int y, int color) {
+        g.text(this.font, s, px + (pw - this.font.width(s)) / 2, y, color, false);
+    }
+
+    private ItemStack icon(String itemId) {
+        return icons.computeIfAbsent(itemId, k -> {
+            Identifier id = Identifier.tryParse(k);
+            Item item = id == null ? null : BuiltInRegistries.ITEM.getValue(id);
+            if (item == null || item == Items.AIR) {
+                item = Items.ENCHANTED_BOOK;
+            }
+            return new ItemStack(item);
+        });
+    }
+
+    private String fit(String s, int w) {
+        if (w <= 0) {
+            return "";
+        }
+        if (this.font.width(s) <= w) {
+            return s;
+        }
+        return this.font.plainSubstrByWidth(s, Math.max(0, w - this.font.width(".."))) + "..";
+    }
+
+    private static List<Component> tip(String title, String... lines) {
+        List<Component> out = new ArrayList<>();
+        out.add(Component.literal(title).withStyle(ChatFormatting.WHITE));
+        for (String l : lines) {
+            out.add(Component.literal(l).withStyle(ChatFormatting.GRAY));
+        }
+        return out;
+    }
+
+    private static List<Component> entryTooltip(EnchantCatalog.Entry e, EnchantRule rule, boolean priceActive,
+                                                int best, int limit, int level) {
+        List<Component> out = new ArrayList<>();
+        out.add(Component.literal(e.name().getString() + (e.maxLevel() > 1 ? " " + EnchantInfo.roman(e.maxLevel()) : ""))
+                .withStyle(ChatFormatting.GOLD));
+        for (String l : EnchantInfo.wrap(EnchantInfo.description(e.id()), 42)) {
+            out.add(Component.literal(l).withStyle(ChatFormatting.GRAY));
+        }
+        out.add(Component.empty());
+        out.add(Component.literal("Works on: " + EnchantGroups.of(e.id()).title).withStyle(ChatFormatting.DARK_AQUA));
+        out.add(Component.literal("Max level: " + EnchantInfo.roman(e.maxLevel())).withStyle(ChatFormatting.DARK_AQUA));
+        out.add(Component.literal("Cheapest possible" + (e.maxLevel() > 1 ? " (level " + EnchantInfo.roman(level) + ")" : "")
+                + ": " + best + " emeralds").withStyle(ChatFormatting.GREEN));
+        if (priceActive) {
+            out.add(Component.literal("Your limit: " + limit + " emeralds (" + rule.maxPercent + "%)").withStyle(ChatFormatting.YELLOW));
+        }
+        if (e.doublePrice()) {
+            out.add(Component.literal("Treasure enchant: books cost double").withStyle(ChatFormatting.LIGHT_PURPLE));
+        }
+        out.add(Component.literal(switch (rule.mode) {
+            case WANT -> "Wanted: rerolling stops when it's offered.";
+            case AVOID -> "Avoided: villagers offering it are skipped.";
+            case IGNORE -> "Ignored.";
+        }).withStyle(ChatFormatting.DARK_GRAY));
+        return out;
+    }
+
+    // ------------------------------------------------------------------ input
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+        int button = event.button();
+        if (button == 0 || button == 1) {
+            for (int i = zones.size() - 1; i >= 0; i--) {
+                Zone z = zones.get(i);
+                if (z.hit(event.x(), event.y())) {
+                    if (z.click() == null) {
+                        break;
+                    }
+                    clearFocus();
+                    AbstractWidget.playButtonClickSound(Minecraft.getInstance().getSoundManager());
+                    z.click().run(button);
+                    return true;
+                }
+            }
+        }
+        return super.mouseClicked(event, doubleClick);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (mouseX >= px && mouseX < px + pw && mouseY >= listTop && mouseY < listBottom) {
+            if (scrollY > 0) {
+                scroll = Math.max(0, scroll - 2);
+            } else if (scrollY < 0) {
+                scroll += 2; // clamped when drawn
+            }
+            return true;
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    // ------------------------------------------------------------------ data helpers
 
     private List<EnchantCatalog.Entry> shownEntries(RerollerConfig cfg) {
         String q = search.trim().toLowerCase(Locale.ROOT);
         List<EnchantCatalog.Entry> out = new ArrayList<>();
         for (EnchantCatalog.Entry e : catalog) {
-            EnchantRule r = cfg.ruleOrNull(e.id());
-            EnchantRule.Mode mode = r == null ? EnchantRule.Mode.IGNORE : r.mode;
-            if (filter == Filter.WANTED && mode != EnchantRule.Mode.WANT) {
+            EnchantRule.Mode m = mode(cfg, e.id());
+            if (filter == Filter.WANTED && m != EnchantRule.Mode.WANT) {
                 continue;
             }
-            if (filter == Filter.AVOIDED && mode != EnchantRule.Mode.AVOID) {
+            if (filter == Filter.AVOIDED && m != EnchantRule.Mode.AVOID) {
                 continue;
             }
             if (!q.isEmpty()) {
@@ -279,125 +690,33 @@ public final class RerollerScreen extends Screen {
         return out;
     }
 
+    private static EnchantRule.Mode mode(RerollerConfig cfg, String id) {
+        EnchantRule r = cfg.ruleOrNull(id);
+        return r == null ? EnchantRule.Mode.IGNORE : r.mode;
+    }
+
     private static List<String> ids(List<EnchantCatalog.Entry> entries) {
         List<String> out = new ArrayList<>();
-        if (entries != null) {
-            for (EnchantCatalog.Entry e : entries) {
-                out.add(e.id());
-            }
+        for (EnchantCatalog.Entry e : entries) {
+            out.add(e.id());
         }
         return out;
-    }
-
-    private void addHeader(int left, int y, EnchantGroups.Group group, List<String> groupIds, RerollerConfig cfg) {
-        int wanted = 0;
-        for (String id : groupIds) {
-            EnchantRule r = cfg.ruleOrNull(id);
-            if (r != null && r.mode == EnchantRule.Mode.WANT) {
-                wanted++;
-            }
-        }
-        String title = group.title.toUpperCase(Locale.ROOT) + (wanted > 0 ? "  (" + wanted + " wanted)" : "");
-        label(left, y + 7, 214, title, AQUA, false);
-        addRenderableWidget(Button.builder(Component.literal("Want all").withStyle(ChatFormatting.GREEN), b -> {
-            EnchantGroups.setAll(cfg, groupIds, EnchantRule.Mode.WANT);
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 218, y + 1, 46, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Avoid all").withStyle(ChatFormatting.RED), b -> {
-            EnchantGroups.setAll(cfg, groupIds, EnchantRule.Mode.AVOID);
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 268, y + 1, 48, 18).build());
-        addRenderableWidget(Button.builder(Component.literal("Clear"), b -> {
-            EnchantGroups.setAll(cfg, groupIds, EnchantRule.Mode.IGNORE);
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 320, y + 1, 40, 18).build());
-    }
-
-    private void addRow(int left, int y, EnchantCatalog.Entry e, RerollerConfig cfg) {
-        EnchantRule existing = cfg.ruleOrNull(e.id());
-        EnchantRule.Mode mode = existing == null ? EnchantRule.Mode.IGNORE : existing.mode;
-        boolean active = mode == EnchantRule.Mode.WANT;
-
-        int nameColor = switch (mode) {
-            case WANT -> GREEN;
-            case AVOID -> RED;
-            case IGNORE -> WHITE;
-        };
-        label(left + 8, y + 6, 124, e.name().getString(), nameColor, false);
-
-        addRenderableWidget(Button.builder(modeLabel(mode), b -> {
-            EnchantRule r = cfg.rule(e.id());
-            r.mode = r.mode.next();
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 134, y, 58, 20).build());
-
-        EnchantRule rule = existing != null ? existing : new EnchantRule();
-        int effectiveLevel = rule.requiredLevel(e.maxLevel());
-
-        Button lvl = Button.builder(
-                Component.literal(rule.minLevel <= 0 ? "Max lvl" : ">= " + rule.minLevel),
-                b -> {
-                    EnchantRule r = cfg.rule(e.id());
-                    r.minLevel = nextMinLevel(r.minLevel, e.maxLevel());
-                    searchFocused = false;
-                    rebuildWidgets();
-                }).bounds(left + 196, y, 48, 20).build();
-        lvl.active = active && e.maxLevel() > 1;
-        addRenderableWidget(lvl);
-
-        Button minus = Button.builder(Component.literal("-"), b -> {
-            EnchantRule r = cfg.rule(e.id());
-            r.maxPercent = stepDown(r.maxPercent);
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 248, y, 20, 20).build();
-        minus.active = active;
-        addRenderableWidget(minus);
-
-        int best = PriceCalc.bestPrice(cfg.priceModel, effectiveLevel, e.doublePrice());
-        if (active) {
-            int limit = PriceCalc.priceLimit(best, rule.maxPercent);
-            label(left + 270, y + 6, 68, rule.maxPercent + "% (<=" + limit + ")", YELLOW, true);
-        } else {
-            label(left + 270, y + 6, 68, "best " + best, GRAY, true);
-        }
-
-        Button plus = Button.builder(Component.literal("+"), b -> {
-            EnchantRule r = cfg.rule(e.id());
-            r.maxPercent = stepUp(r.maxPercent);
-            searchFocused = false;
-            rebuildWidgets();
-        }).bounds(left + 340, y, 20, 20).build();
-        plus.active = active;
-        addRenderableWidget(plus);
-    }
-
-    private static Component modeLabel(EnchantRule.Mode mode) {
-        return switch (mode) {
-            case IGNORE -> Component.literal("Ignore").withStyle(ChatFormatting.GRAY);
-            case WANT -> Component.literal("Want").withStyle(ChatFormatting.GREEN);
-            case AVOID -> Component.literal("Avoid").withStyle(ChatFormatting.RED);
-        };
     }
 
     private static String statusText() {
         var controller = VillagerRerollerClient.CONTROLLER;
         var cal = VillagerRerollerClient.CALIBRATION;
-        String bed = cal.hasBed() ? "  |  bed set" : "  |  no bed";
+        String bed = cal.hasBed() ? "  ·  bed set" : "  ·  no bed";
         if (controller.isRunning()) {
-            return (controller.isNightPaused() ? "Night pause" : "Running") + " - reroll #" + controller.rerolls() + bed;
+            return (controller.isNightPaused() ? "Night pause" : "Running") + "  ·  reroll #" + controller.rerolls() + bed;
         }
         if (cal.isDone()) {
-            return "Calibrated. Ready." + bed;
+            return "Calibrated and ready" + bed;
         }
         if (cal.isActive()) {
-            return "Calibrating... follow the chat instructions.";
+            return "Calibrating... follow the chat instructions";
         }
-        return "Not calibrated - press Calibrate first.";
+        return "Not calibrated: press Calibrate first";
     }
 
     private static int statusColor() {
@@ -407,34 +726,6 @@ public final class RerollerScreen extends Screen {
         }
         return cal.isActive() ? YELLOW : ORANGE;
     }
-
-    private void label(int x, int y, int w, String text, int color, boolean center) {
-        labels.add(new Label(x, y, w, text, color, center));
-    }
-
-    private String fit(String s, int w) {
-        if (this.font.width(s) <= w) {
-            return s;
-        }
-        return this.font.plainSubstrByWidth(s, Math.max(0, w - this.font.width(".."))) + "..";
-    }
-
-    @Override
-    public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
-        if (rebuildPending) {
-            // typing in the search box: rebuild outside the key event, keep focus in the box
-            rebuildPending = false;
-            rebuildWidgets();
-        }
-        super.extractRenderState(g, mouseX, mouseY, delta);
-        for (Label l : labels) {
-            String s = fit(l.text(), l.w());
-            int x = l.center() ? l.x() + l.w() / 2 - this.font.width(s) / 2 : l.x();
-            g.text(this.font, s, x, l.y(), l.color(), true);
-        }
-    }
-
-    // ------------------------------------------------------------------ value helpers
 
     private static int stepUp(int pct) {
         int step = pct < 200 ? 10 : pct < 400 ? 25 : 100;
@@ -458,13 +749,15 @@ public final class RerollerScreen extends Screen {
         return n >= maxLevel ? 0 : n;
     }
 
-    private static int nextRerollLimit(int current) {
-        for (int i = 0; i < MAX_REROLL_CHOICES.length; i++) {
-            if (MAX_REROLL_CHOICES[i] == current) {
-                return MAX_REROLL_CHOICES[(i + 1) % MAX_REROLL_CHOICES.length];
-            }
+    /** The reverse of {@link #nextMinLevel}. */
+    static int prevMinLevel(int current, int maxLevel) {
+        if (maxLevel <= 1) {
+            return 0;
         }
-        return MAX_REROLL_CHOICES[0];
+        if (current <= 0) {
+            return maxLevel - 1;
+        }
+        return current - 1 <= 0 ? 0 : current - 1;
     }
 
     private void saveAndClose() {
