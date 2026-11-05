@@ -95,7 +95,6 @@ final class Showcase {
                 mc.gui.setScreen(new RerollerScreen());
             }
             case "close" -> mc.gui.setScreen(null);
-            case "hud" -> mc.options.hideGui = a.length > 1 && a[1].equals("off");
             case "demo" -> {
                 // the live run: popular enchants at any level, generous price, so the video ends on a find
                 for (String id : List.of("mending", "unbreaking", "sharpness", "efficiency", "fortune", "protection",
