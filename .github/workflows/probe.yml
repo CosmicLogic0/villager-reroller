@@ -22,26 +22,29 @@ jobs:
           J=$(find ~/.gradle/caches -name '*.jar' -path '*minecraft*' -size +10M | xargs -I{} sh -c 'unzip -l "{}" 2>/dev/null | grep -q "net/minecraft/client/Minecraft.class" && echo "{}"' | head -1)
           echo "JAR=$J"
           for c in \
-            net.minecraft.client.multiplayer.ClientLevel \
-            net.minecraft.world.level.Level \
-            net.minecraft.world.level.storage.LevelData \
-            net.minecraft.client.multiplayer.MultiPlayerGameMode \
-            net.minecraft.network.protocol.game.ServerboundPlayerActionPacket \
-            'net.minecraft.network.protocol.game.ServerboundPlayerActionPacket$Action' \
-            net.minecraft.network.protocol.game.ServerboundSwingPacket \
-            net.minecraft.client.multiplayer.ClientPacketListener \
-            net.minecraft.client.KeyMapping \
-            net.minecraft.client.Options \
-            net.minecraft.world.entity.player.Player \
-            net.minecraft.world.entity.LivingEntity \
-            net.minecraft.world.level.block.BedBlock \
-            net.minecraft.client.gui.components.EditBox \
+            net.minecraft.client.gui.GuiGraphicsExtractor \
+            net.minecraft.client.gui.components.AbstractWidget \
+            net.minecraft.client.gui.components.AbstractButton \
+            net.minecraft.client.gui.components.Button \
+            net.minecraft.client.gui.components.Tooltip \
+            net.minecraft.client.gui.components.events.GuiEventListener \
+            net.minecraft.client.gui.components.events.ContainerEventHandler \
             net.minecraft.client.gui.screens.Screen \
-            net.minecraft.world.level.block.state.BlockBehaviour\$BlockStateBase \
-            net.minecraft.client.player.LocalPlayer ; do
+            net.minecraft.client.input.MouseButtonEvent \
+            net.minecraft.client.input.InputWithModifiers \
+            net.minecraft.client.resources.sounds.SimpleSoundInstance \
+            net.minecraft.core.registries.BuiltInRegistries \
+            net.minecraft.core.DefaultedRegistry \
+            net.minecraft.resources.Identifier \
+            net.minecraft.resources.ResourceLocation \
+            net.minecraft.world.item.ItemStack \
+            net.minecraft.client.gui.narration.NarrationElementOutput ; do
             echo "=================== $c"
-            javap -cp "$J" -public "$c" 2>&1 | grep -iE "class |interface |DayTime|getDayTime|isDay|isNight|isDark|clock|Time\(|destroy|ActionPacket\(|SwingPacket\(|START_|STOP_|ABORT|send\(|setDown|isDown|keyUp|keyDown|keyLeft|keyRight|keyShift|keyJump|keyAttack|isSleeping|getSleepingPos|stopSleep|EditBox\(|setResponder|setValue|getValue|setHint|setMaxLength|setFocused|setInitialFocus|addRenderableWidget|getDestroyProgress|ensureHasSent|useItemOn|interact\(|Sleep" | head -80
+            javap -cp "$J" -public "$c" 2>&1 | head -150
           done
-          for p in net/minecraft/world/clock net/minecraft/world/timeline ; do
-            echo "=================== package $p"; unzip -l "$J" | grep " $p/" | head -20
-          done
+          echo "=================== SoundEvents"
+          javap -cp "$J" -public net.minecraft.sounds.SoundEvents | grep -E " (NOTE_BLOCK_PLING|NOTE_BLOCK_BASS|NOTE_BLOCK_CHIME|NOTE_BLOCK_BELL|PLAYER_LEVELUP|UI_TOAST_CHALLENGE_COMPLETE|BEACON_ACTIVATE|BEACON_DEACTIVATE|EXPERIENCE_ORB_PICKUP|AMETHYST_BLOCK_CHIME|UI_BUTTON_CLICK|VILLAGER_YES|VILLAGER_NO|VILLAGER_CELEBRATE|ANVIL_LAND);"
+          echo "=================== Items"
+          javap -cp "$J" -public net.minecraft.world.item.Items | grep -E "SPEAR|CHAIN|HEAVY_CORE|WIND_CHARGE|LIGHTNING_ROD|SCULK_SENSOR|ENCHANTED_BOOK|EMERALD;|MACE|NAUTILUS|WITHER_ROSE|EXPERIENCE_BOTTLE" | head -30
+          echo "=================== gui packages"
+          unzip -l "$J" | grep -E " net/minecraft/client/gui/(components/[A-Za-z]*Tooltip|render/|components/ScrollableLayout|components/AbstractScrollArea|components/AbstractContainerWidget)" | head -40
