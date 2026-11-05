@@ -39,10 +39,21 @@ printf 'onboardAccessibility:false\nskipMultiplayerWarning:true\njoinedFirstServ
 (timeout 900 xvfb-run -n 99 -s "-screen 0 1280x720x24 +extension GLX +render -noreset -ac" \
    portablemc --main-dir "$G" start --jvm-policy mojang-then-system -u Tester --join-server 127.0.0.1 --join-server-port 25565 "$spec" --jvm-arg=-Xmx3G,-Dvillagerreroller.selftest=true --resolution 1280x720 > game.log 2>&1 &)
 
-loaded=0; done_=0
+loaded=0; done_=0; shot=0
 for i in $(seq 1 170); do
   sleep 5
   grep -q "VRTEST loaded" game.log && loaded=1
+  if [ "$shot" = 0 ] && grep -q "VRTEST menu shot" game.log; then
+    shot=1; sleep 3
+    # screenshot 1: mouse parked off the panel; screenshot 2: hovering the first enchant row (tooltip)
+    DISPLAY=:99 xdotool mousemove 20 700 || true
+    sleep 2; import -display :99 -window root "$out/menu.png" || true
+    DISPLAY=:99 xdotool mousemove 340 238 || true
+    sleep 2; import -display :99 -window root "$out/menu-hover.png" || true
+    for f in menu menu-hover; do
+      [ -f "$out/$f.png" ] && convert "$out/$f.png" -quality 82 "$out/$f.jpg" && { echo "SHOT_BEGIN $f"; base64 -w 120 "$out/$f.jpg"; echo "SHOT_END $f"; }
+    done
+  fi
   grep -q "VRTEST done" game.log && { done_=1; break; }
   grep -qE "VRTEST failed|Incompatible mods found|Missing or unsupported mandatory dependencies|requires .* which is missing|Crash report saved|---- Minecraft Crash Report ----" game.log && break
   pgrep -f "portablemc|java" > /dev/null || break
