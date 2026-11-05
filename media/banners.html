@@ -1,0 +1,77 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+@font-face{font-family:Pix;src:url(pixelify-sans-latin-400-normal.woff2);font-weight:400}
+@font-face{font-family:Pix;src:url(pixelify-sans-latin-700-normal.woff2);font-weight:700}
+body{margin:0;background:#000}
+.b{position:relative;overflow:hidden;font-family:Pix,monospace;color:#fff;image-rendering:pixelated}
+.bg{position:absolute;inset:0;background-size:cover;background-position:center}
+.shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(0,0,0,.78) 0%,rgba(0,0,0,.55) 45%,rgba(0,0,0,0) 75%)}
+/* Minecraft tooltip box */
+.tip{background:rgba(16,0,16,.94);border:4px solid #2a0a5e;outline:4px solid rgba(16,0,16,.94);box-shadow:inset 0 0 0 4px #4b1fa8;padding:22px 28px}
+.sh{text-shadow:4px 4px 0 #3f3f3f}
+.btn{display:inline-block;font-weight:700;padding:10px 22px;border:4px solid #000;box-shadow:inset 4px 4px 0 rgba(255,255,255,.35),inset -4px -4px 0 rgba(0,0,0,.35);text-shadow:3px 3px 0 rgba(0,0,0,.45)}
+.stone{background:#7d7d7d}
+.grass{background:#4c8a2b}
+.gold{background:#e0a91c;color:#2b1a00;text-shadow:none}
+.li{display:flex;align-items:center;gap:16px;margin:10px 0}
+.li img{width:27px;height:30px}
+.logo{image-rendering:pixelated}
+</style></head><body>
+
+<!-- 1. gallery / hero 1600x900 -->
+<div id="hero" class="b" style="width:1600px;height:900px">
+  <div class="bg" style="background-image:url(scene.png)"></div>
+  <div class="shade"></div>
+  <div style="position:absolute;left:80px;top:70px">
+    <div style="display:flex;align-items:center;gap:30px">
+      <img class="logo" src="logo512.png" style="width:150px;height:150px">
+      <div class="sh" style="font-size:96px;font-weight:700;line-height:.95">Villager<br>Reroller</div>
+    </div>
+    <div class="sh" style="font-size:40px;margin:34px 0 26px;max-width:760px;line-height:1.2;color:#f3f3f3">Reroll a librarian until it sells<br>the book you want, at your price.</div>
+    <div class="tip" style="display:inline-block;font-size:33px">
+      <div class="li"><img src="emerald.png">Pick the enchants you want</div>
+      <div class="li"><img src="emerald.png">Set a price limit in emeralds</div>
+      <div class="li"><img src="emerald.png">Your camera never moves</div>
+      <div class="li"><img src="emerald.png">Sleeps through the night</div>
+    </div>
+    <div style="margin-top:30px;font-size:30px;display:flex;gap:18px">
+      <span class="btn grass">Fabric &middot; Minecraft 26.3</span>
+      <span class="btn stone">Client-side</span>
+    </div>
+  </div>
+</div>
+
+<!-- 2. description header 1700x420 -->
+<div id="header" class="b" style="width:1700px;height:420px;margin-top:20px">
+  <div class="bg" style="background-image:url(scene.png);background-position:center 60%"></div>
+  <div class="shade"></div>
+  <div style="position:absolute;left:70px;top:58px;display:flex;gap:34px;align-items:flex-start">
+    <img class="logo" src="logo512.png" style="width:170px;height:170px">
+    <div>
+      <div class="sh" style="font-size:92px;font-weight:700;line-height:1">Villager Reroller</div>
+      <div class="sh" style="font-size:38px;margin-top:14px">Reroll librarians automatically until the right book shows up</div>
+      <div class="sh" style="font-size:28px;margin-top:10px;color:#d8d8d8">Enchant picker &middot; Price limit &middot; Night handling &middot; Sounds</div>
+      <div style="margin-top:24px;font-size:28px;display:flex;gap:16px">
+        <span class="btn grass">Fabric &middot; Minecraft 26.3</span>
+        <span class="btn gold">Stops on the book you want</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 3. donate 1700x460 -->
+<div id="donate" class="b" style="width:1700px;height:460px;margin-top:20px">
+  <div class="bg" style="background-image:url(scene.png);background-position:center 30%;filter:blur(3px) brightness(.55);transform:scale(1.04)"></div>
+  <div class="tip" style="position:absolute;inset:34px;display:flex;align-items:center;gap:60px;padding:0 70px">
+    <img src="heart.png" style="width:210px;height:210px;image-rendering:pixelated">
+    <div>
+      <div class="sh" style="font-size:76px;font-weight:700">Help keep this mod alive</div>
+      <div class="sh" style="font-size:34px;color:#e6e6e6;margin:12px 0 30px;line-height:1.25">Villager Reroller is free. Donations pay for new Minecraft<br>versions, new features and fixes.</div>
+      <div style="display:flex;align-items:center;gap:34px">
+        <span class="btn gold" style="font-size:40px;padding:16px 40px">Donate with PayPal</span>
+        <span class="sh" style="font-size:32px;color:#e6e6e6">Any amount helps. Thank you!</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>
