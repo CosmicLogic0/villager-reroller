@@ -1,0 +1,47 @@
+# Builds the mod page images (logo, banners) from the templates in media/ and the in-game captures on the
+# "media" branch, and adds them to that branch. Run it from the Actions tab after "Showcase media".
+name: Page media
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tools
+        run: |
+          pip install -q pillow
+          cd media
+          npm init -y > /dev/null
+          npm i -s playwright@1.49.1
+          npx playwright install --with-deps chromium > /dev/null
+          npm pack -s @fontsource/pixelify-sans
+          tar xzf fontsource-pixelify-sans-*.tgz
+          cp package/files/pixelify-sans-latin-400-normal.woff2 package/files/pixelify-sans-latin-700-normal.woff2 .
+      - name: Render
+        run: |
+          cd media
+          git show origin/media:scene.png > scene.png
+          python3 pixel_logo.py
+          python3 sprites.py
+          node render.js
+          mkdir -p /tmp/page
+          cp logo.png logo_128.png logo_32.png hero.png header.png donate.png /tmp/page/
+          ls -la /tmp/page
+      - name: Add to the media branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -f media
+          git clean -fdxq
+          cp /tmp/page/* .
+          git add -A
+          git commit -m "Page media" || true
+          git push origin media
