@@ -42,6 +42,9 @@ public final class VillagerRerollerClient implements ClientModInitializer {
     private static final boolean SELFTEST = "true".equals(System.getProperty("villagerreroller.selftest"));
     private static int selftestTicks = -1;
 
+    /** CI only: run with -Dvillagerreroller.showcase=true to record the mod page's screenshots and video. */
+    private static final boolean SHOWCASE = "true".equals(System.getProperty("villagerreroller.showcase"));
+
     private static boolean openMenuNextTick;
 
     @Override
@@ -70,6 +73,9 @@ public final class VillagerRerollerClient implements ClientModInitializer {
             CONTROLLER.tick(mc);
             if (SELFTEST) {
                 selftestTick(mc);
+            }
+            if (SHOWCASE) {
+                Showcase.tick(mc);
             }
         });
 
