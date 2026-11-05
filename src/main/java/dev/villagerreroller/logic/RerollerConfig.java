@@ -36,6 +36,15 @@ public final class RerollerConfig {
     /** Ticks to give the villager to claim the freshly placed lectern before we talk to it. */
     public int claimWaitTicks = 20;
 
+    /**
+     * How long to keep waiting for the villager to take the job before the lectern is broken and placed again.
+     * Villagers can take a while to notice a new lectern.
+     */
+    public int claimTimeoutSeconds = 60;
+
+    /** At night villagers go to bed instead of taking jobs: pause, sleep in the calibrated bed, then carry on. */
+    public boolean handleNight = true;
+
     public PriceModel priceModel = new PriceModel();
 
     public EnchantRule rule(String id) {
@@ -75,6 +84,7 @@ public final class RerollerConfig {
         maxRerolls = clamp(maxRerolls, 0, 1_000_000);
         actionDelayTicks = clamp(actionDelayTicks, 1, 40);
         claimWaitTicks = clamp(claimWaitTicks, 5, 200);
+        claimTimeoutSeconds = clamp(claimTimeoutSeconds, 10, 600);
         if (priceModel == null) {
             priceModel = new PriceModel();
         }
