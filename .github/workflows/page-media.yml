@@ -39,7 +39,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -f media
+          git checkout -f -B media origin/media --
           git clean -fdxq
           cp /tmp/page/* .
           git add -A
