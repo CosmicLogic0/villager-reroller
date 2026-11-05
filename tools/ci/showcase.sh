@@ -45,7 +45,6 @@ say "in world"
 
 # --- the scene: bookshelf wall, a villager in a little fenced cell, its lectern in front of the player
 srv "time set 1000"
-srv "gamerule doDaylightCycle false"
 srv "gamerule advance_time false"
 srv "weather clear 1000000"
 srv "fill -8 -61 -8 12 -61 10 grass_block"
@@ -57,15 +56,18 @@ srv "setblock 6 -60 0 oak_fence"; srv "setblock 6 -59 0 oak_fence"
 srv "setblock 6 -60 -2 potted_poppy"; srv "setblock 6 -60 3 potted_cornflower"
 srv "setblock 3 -60 3 poppy"; srv "setblock 1 -60 -2 dandelion"; srv "setblock 0 -60 2 cornflower"; srv "setblock 4 -60 -3 oxeye_daisy"
 srv "setblock 4 -60 0 lectern[facing=west]"
-srv "summon villager 5.5 -60 0.5 {PersistenceRequired:1b}"
+srv "setblock 5 -61 0 air"
+srv "summon villager 5.5 -61 0.5 {PersistenceRequired:1b}"
 srv "gamemode survival Steve"
 srv "clear Steve"
 srv "give Steve iron_axe 1"
 srv "give Steve lectern 3"
 srv "give Steve bread 16"
-srv "tp Steve 2.7 -60 0.5 -90 16"
+srv "attribute Steve minecraft:entity_interaction_range base set 6"
+srv "attribute Steve minecraft:block_interaction_range base set 6"
+srv "tp Steve 1.2 -60 0.5 -90 12"
 sleep 12
-srv "tp Steve 2.7 -60 0.5 -90 16"
+srv "tp Steve 1.2 -60 0.5 -90 12"
 sleep 4
 
 shot scene-hud
@@ -78,7 +80,7 @@ mod "menu"; sleep 1.5
 mouse 20 700; sleep 1; shot menu
 mouse 340 238; sleep 1.5; shot menu-hover
 mod "close"; sleep 1
-srv "tp Steve 2.7 -60 0.5 -90 16"; sleep 1
+srv "tp Steve 1.2 -60 0.5 -90 12"; sleep 1
 
 # --- calibration chat
 mod "calibrate"; sleep 2; shot calibrate
@@ -86,7 +88,7 @@ mod "calibrate"; sleep 2; shot calibrate
 # --- a real run, recorded
 mod "rules"
 mod "demo"
-srv "tp Steve 2.7 -60 0.5 -90 16"; sleep 1
+srv "tp Steve 1.2 -60 0.5 -90 12"; sleep 1
 mod "preset 4 -60 0"
 mod "start"
 n=0; start=$(date +%s)
