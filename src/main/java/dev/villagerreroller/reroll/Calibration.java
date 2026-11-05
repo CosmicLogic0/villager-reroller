@@ -116,6 +116,23 @@ public final class Calibration {
         Msg.step(mc, "Step 1/4: hold a lectern and place it next to the villager (the villager must not have been traded with yet).");
     }
 
+    /** CI showcase only: sets what calibration would record, without doing the routine by hand. */
+    public void preset(BlockPos lectern, BlockHitResult place, int slot, Entity villager, Direction face, int toolSlot) {
+        BlockPos keepBedPos = bedPos;
+        BlockHitResult keepBedHit = bedHit;
+        reset();
+        bedPos = keepBedPos;
+        bedHit = keepBedHit;
+        lecternPos = lectern;
+        placeHit = place;
+        lecternSlot = slot;
+        villagerId = villager.getId();
+        villagerUuid = villager.getUUID();
+        breakFace = face;
+        breakSlot = toolSlot;
+        step = Step.DONE;
+    }
+
     public void cancel(Minecraft mc) {
         reset();
         Msg.info(mc, "Calibration cancelled.");
