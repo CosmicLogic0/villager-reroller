@@ -94,7 +94,9 @@ public final class VillagerRerollerClient {
     private static int titleTicks;
 
     private static void selftestJoin(Minecraft mc) {
-        if (SELFTEST_JOIN == null || titleTicks < 0 || !(V.screen(mc) instanceof net.minecraft.client.gui.screens.TitleScreen)) {
+        // wait until the title screen is up and the resource loading overlay is gone
+        if (SELFTEST_JOIN == null || titleTicks < 0 || mc.getOverlay() != null
+                || !(V.screen(mc) instanceof net.minecraft.client.gui.screens.TitleScreen)) {
             return;
         }
         if (++titleTicks < 60) {

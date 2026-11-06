@@ -48,8 +48,24 @@ public final class FabricEntry implements ClientModInitializer {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) ->
                 dispatcher.register(VillagerRerollerClient.<FabricClientCommandSource>command()));
         //#elif MC >= 1.16
-        ClientCommandManager.DISPATCHER.register(VillagerRerollerClient.<FabricClientCommandSource>command());
+        // Fabric API's client commands arrived late in 1.16; older Fabric API builds don't have them
+        if (FabricLoader.getInstance().isModLoaded("fabric-command-api-v1")) {
+            try {
+                Commands16.register();
+            } catch (Throwable t) {
+                VillagerRerollerClient.LOGGER.warn("Villager Reroller: this Fabric API has no client commands; use the V key menu");
+            }
+        }
         //#endif
         // Minecraft 1.15 has no client commands in Fabric: the V key menu does everything.
     }
+
+    //#if MC >= 1.16 && MC < 1.19
+    /** In its own class so a Fabric API without client commands never loads it. */
+    private static final class Commands16 {
+        static void register() {
+            ClientCommandManager.DISPATCHER.register(VillagerRerollerClient.<FabricClientCommandSource>command());
+        }
+    }
+    //#endif
 }
