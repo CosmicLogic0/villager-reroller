@@ -24,5 +24,6 @@
     "minecraft": "~26.3",
     "java": ">=25",
     "fabric-api": "*"
-  }
+  },
+  "icon": "assets/villagerreroller/icon.png"
 }
