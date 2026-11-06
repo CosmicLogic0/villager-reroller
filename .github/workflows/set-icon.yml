@@ -1,0 +1,38 @@
+# Puts the pixel logo (media/pixel_logo.py) into the mod as its icon (shown by Mod Menu and launchers)
+# and points fabric.mod.json at it. Run it from the Actions tab.
+name: Set mod icon
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  icon:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Make the icon
+        run: |
+          pip install -q pillow
+          cd media && python3 pixel_logo.py && cd ..
+          mkdir -p src/main/resources/assets/villagerreroller
+          cp media/logo_128.png src/main/resources/assets/villagerreroller/icon.png
+          python3 - <<'PY'
+          import json
+          p = 'src/main/resources/fabric.mod.json'
+          d = json.load(open(p))
+          d['icon'] = 'assets/villagerreroller/icon.png'
+          json.dump(d, open(p, 'w'), indent=2)
+          open(p, 'a').write('\n')
+          PY
+          rm -f media/logo*.png
+          git status --short
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/resources/assets/villagerreroller/icon.png src/main/resources/fabric.mod.json
+          git commit -m "Mod icon: the pixel logo"
+          git push origin HEAD:main
