@@ -106,7 +106,7 @@ public final class VillagerRerollerClient {
         String host = SELFTEST_JOIN.substring(0, SELFTEST_JOIN.lastIndexOf(':'));
         int port = Integer.parseInt(SELFTEST_JOIN.substring(SELFTEST_JOIN.lastIndexOf(':') + 1));
         LOGGER.info("VRTEST joining " + host + ":" + port);
-        //#if MC >= 1.17 && MC < 1.18
+        //#if MC >= 1.17 && MC < 1.19
         net.minecraft.client.gui.screens.ConnectScreen.startConnecting(V.screen(mc), mc,
                 new net.minecraft.client.multiplayer.resolver.ServerAddress(host, port), null);
         //#elif MC < 1.17

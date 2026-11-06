@@ -65,9 +65,9 @@ PY
   echo "using local stand-in for Mojang services" ;;
 esac
 
-# Minecraft 1.15 - 1.17 crash when told to join a server while still loading: the mod joins from the title screen
+# Minecraft 1.15 - 1.18 can crash when told to join a server while still loading: the mod joins from the title screen
 join="--join-server 127.0.0.1 --join-server-port 25565"
-[ "$loader" = fabric ] && case "$gv" in 1.15*|1.16*|1.17*) join=""; extra="$extra,-Dvillagerreroller.selftest.join=127.0.0.1:25565" ;; esac
+[ "$loader" = fabric ] && case "$gv" in 1.15*|1.16*|1.17*|1.18*) join=""; extra="$extra,-Dvillagerreroller.selftest.join=127.0.0.1:25565" ;; esac
 
 # game options: no first-launch screens, keep running without focus
 printf 'onboardAccessibility:false\nskipMultiplayerWarning:true\njoinedFirstServer:true\npauseOnLostFocus:false\ntutorialStep:none\nrenderDistance:6\nguiScale:2\nnarrator:0\nsoundCategory_master:0.0\n' > "$G/options.txt"
