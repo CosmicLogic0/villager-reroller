@@ -93,7 +93,18 @@ pkill -f java || true; sleep 3
 cp "$S/server.log" "$out/server.log" 2>/dev/null || true
 
 if grep -qE "Crash report saved|---- Minecraft Crash Report ----" game.log; then
-  cat "$G"/crash-reports/*.txt >> game.log 2>/dev/null; fail "the game crashed"
+  CR=$(ls -t "$G"/crash-reports/*.txt 2>/dev/null | head -1)
+  # control: the same game without Villager Reroller, to tell a mod crash from a game that can't run here
+  mkdir -p "$G/off"; mv "$G/mods/$(basename "$jar")" "$G/off/"; rm -rf "$G/crash-reports"
+  (timeout 300 xvfb-run -n 98 -s "-screen 0 1280x720x24 +extension GLX +render -noreset -ac" \
+     portablemc --main-dir "$G" start --jvm-policy mojang-then-system -u Tester "$spec" --jvm-arg=-Xmx3G$extra --resolution 1280x720 > control.log 2>&1 &)
+  ctl="no crash within 2 minutes"
+  for i in $(seq 1 24); do sleep 5; grep -qE "Crash report saved|---- Minecraft Crash Report ----" control.log && { ctl="CRASHES TOO"; break; }; done
+  pkill -f java || true; sleep 2
+  { echo "control run without the mod: $ctl"; echo; head -n 60 "$CR" 2>/dev/null; } > crash_head.txt
+  cat "$CR" >> game.log 2>/dev/null
+  fail "the game crashed (without the mod: $ctl)
+$(cat crash_head.txt)"
 fi
 grep -q "VRTEST failed" game.log && fail "the mod's self-test threw: $(grep -m1 'VRTEST failed' game.log)"
 L=$(grep -m1 -oE "(Incompatible mods found|Missing or unsupported mandatory dependencies|requires .* which is missing|ModLoadingException|Failed to load mod|Mod loading has failed)[^\r]*" game.log)

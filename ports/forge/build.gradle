@@ -54,7 +54,7 @@ def packFormats = ['1.15.2': 5, '1.16.5': 6, '1.17.1': 7, '1.18': 8, '1.18.1': 8
 def pack = packFormats[mcv] ?: 15
 processResources {
     def props = ['version': project.mod_version, 'mcRange': mcRange, 'loaderMajor': loaderMajor, 'pack': pack,
-                 'loaderId': loaderName, 'mandatory': neo ? 'type = "required"' : 'mandatory = true']
+                 'loaderId': loaderName, 'mandatory': neoNewToml ? 'type = "required"' : 'mandatory = true']
     inputs.properties props
     inputs.property 'neoNewToml', neoNewToml
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) { expand props }
