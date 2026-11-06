@@ -316,7 +316,7 @@ public final class RerollerScreen extends VrScreen {
         for (EnchantCatalog.Entry e : shown) {
             byGroup.computeIfAbsent(EnchantGroups.of(e.id()), k -> new ArrayList<>()).add(e);
         }
-        boolean filtering = !search.isBlank() || filter != Filter.ALL; // open every section while searching
+        boolean filtering = !search.trim().isEmpty() || filter != Filter.ALL; // open every section while searching
         List<Line> lines = new ArrayList<>();
         for (Map.Entry<EnchantGroups.Group, List<EnchantCatalog.Entry>> grp : byGroup.entrySet()) {
             lines.add(new Line(grp.getKey(), null));
