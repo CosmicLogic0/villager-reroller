@@ -1,0 +1,54 @@
+// Villager Reroller for Forge on Minecraft 26.x: the main (Fabric) mod's code, with small stand-ins for the
+// Fabric API classes it uses (../src/shim26) backed by Forge's events. Stand-ins live in our own package.
+plugins {
+    id 'java'
+    id 'net.minecraftforge.gradle' version '[7.0.17,8)'
+}
+
+apply from: '../shared.gradle'
+def mcv = project.minecraft_version as String
+version = "${project.mod_version}+forge-${mcv}"
+group = 'dev.villagerreroller'
+base { archivesName = 'villager-reroller' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+minecraft {
+    runs {
+        configureEach { workingDir = layout.projectDirectory.dir('run') }
+        register('client')
+    }
+}
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+dependencies {
+    implementation minecraft.dependency("net.minecraftforge:forge:${mcv}-${project.forge_version}")
+}
+
+def gen = layout.buildDirectory.dir('gen-src').get().asFile
+def ctx = [mc: '1.99', FABRIC: false, FORGE: true, NEOFORGE: false, JAVA8: false, RELOCATE: true,
+           REPLACE: ['import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;': 'import net.minecraft.commands.CommandSourceStack;',
+                     'FabricClientCommandSource': 'CommandSourceStack']]
+tasks.register('vrSources') {
+    inputs.dir('../src/shim26'); inputs.dir('../../src/main/java'); outputs.dir(gen)
+    doLast { vrGenerate(['../src/shim26', '../../src/main/java'], gen, ctx) }
+}
+def res = layout.buildDirectory.dir('gen-res')
+def mcRange = project.findProperty('mc_range') ?: "[${mcv}]"
+def forgeMajor = (project.forge_version.split('\\.')[0]) as int
+tasks.register('vrResources', Sync) {
+    from('../../src/main/resources') { include 'assets/**' }
+    from('src/res')
+    into res
+    inputs.property 'v', "${project.mod_version} ${mcRange} ${forgeMajor}"
+    filesMatching('META-INF/mods.toml') { expand 'version': project.mod_version, 'mcRange': mcRange, 'forgeMajor': forgeMajor }
+}
+sourceSets.main.java.srcDirs = [gen]
+sourceSets.main.resources.srcDirs = [res]
+compileJava.dependsOn 'vrSources'
+processResources.dependsOn 'vrResources'
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn 'vrSources', 'vrResources' }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 25 }

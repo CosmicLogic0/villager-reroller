@@ -1,0 +1,29 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "All Rights Reserved"
+issueTrackerURL = "https://github.com/CosmicLogic0/villager-reroller/issues"
+
+[[mods]]
+modId = "villagerreroller"
+version = "${version}"
+displayName = "Villager Reroller"
+authors = "CosmicLogic"
+displayURL = "https://github.com/CosmicLogic0/villager-reroller"
+logoFile = "assets/villagerreroller/icon.png"
+description = """
+Automatically rerolls a librarian's trades (break and replace the lectern) until it offers the enchanted book you want at a price you accept. Client-side, with an in-game menu.
+"""
+
+[[dependencies.villagerreroller]]
+modId = "neoforge"
+type = "required"
+versionRange = "[26,)"
+ordering = "NONE"
+side = "CLIENT"
+
+[[dependencies.villagerreroller]]
+modId = "minecraft"
+type = "required"
+versionRange = "${mcRange}"
+ordering = "NONE"
+side = "CLIENT"

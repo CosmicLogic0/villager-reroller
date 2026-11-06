@@ -1,0 +1,71 @@
+// Villager Reroller for Forge (Minecraft 1.15.2 - 1.21.11) and NeoForge (1.20.2 - 1.21.11), built with Architectury Loom.
+// Same code as the Fabric builds (../src/common + the main mod's logic); the loader's entry is in ../src/forge or ../src/neoforge.
+plugins {
+    id 'dev.architectury.loom' version "${arch_loom_version}"
+}
+
+apply from: '../shared.gradle'
+def neo = project.findProperty('loom.platform') == 'neoforge'
+def loaderName = neo ? 'neoforge' : 'forge'
+def mcv = project.minecraft_version as String
+def javaVer = (project.findProperty('java_version') ?: vrJavaFor(mcv)) as int
+def java8 = javaVer < 16
+
+version = "${project.mod_version}+${loaderName}-${mcv}"
+group = 'dev.villagerreroller'
+base { archivesName = 'villager-reroller' }
+
+loom { silentMojangMappingsLicense() }
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.neoforged.net/releases/' }
+}
+dependencies {
+    minecraft "com.mojang:minecraft:${mcv}"
+    mappings loom.officialMojangMappings()
+    if (neo) neoForge "net.neoforged:neoforge:${project.forge_version}"
+    else forge "net.minecraftforge:forge:${mcv}-${project.forge_version}"
+    if (java8) { annotationProcessor 'com.pkware.jabel:jabel-javac-plugin:1.0.1-1'; compileOnly 'com.pkware.jabel:jabel-javac-plugin:1.0.1-1' }
+}
+
+def gen = layout.buildDirectory.dir('gen-src').get().asFile
+def ctx = [mc: mcv, FABRIC: false, FORGE: !neo, NEOFORGE: neo, JAVA8: java8, RELOCATE: false]
+tasks.register('vrSources') {
+    inputs.dir('../src'); inputs.dir('../../src/main/java/dev/villagerreroller/logic'); inputs.property('ctx', ctx.toString())
+    outputs.dir(gen)
+    doLast { vrGenerate(["../src/${loaderName}", '../src/common', ['../../src/main/java', 'dev/villagerreroller/logic/']], gen, ctx) }
+}
+def assets = layout.buildDirectory.dir('assets-res')
+tasks.register('vrAssets', Sync) { from('../../src/main/resources') { include 'assets/**' }; into assets }
+sourceSets.main.java.srcDirs = [gen]
+sourceSets.main.resources.srcDirs = ['src/res', assets]
+compileJava.dependsOn 'vrSources'
+processResources.dependsOn 'vrAssets'
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn 'vrSources', 'vrAssets' }
+
+def mcRange = project.findProperty('mc_range') ?: "[${mcv}]"
+def loaderMajor = (project.forge_version.split('\\.')[0]) as int
+// NeoForge before 1.20.5 (and Forge) read META-INF/mods.toml, newer NeoForge reads META-INF/neoforge.mods.toml
+def neoNewToml = neo && vrCmp(mcv, '1.20.5') >= 0
+def packFormats = ['1.15.2': 5, '1.16.5': 6, '1.17.1': 7, '1.18': 8, '1.18.1': 8, '1.18.2': 8, '1.19': 9, '1.19.1': 9, '1.19.2': 9, '1.19.3': 12,
+                   '1.19.4': 13, '1.20': 15, '1.20.1': 15, '1.20.2': 18, '1.20.3': 22, '1.20.4': 22, '1.20.5': 32, '1.20.6': 32, '1.21': 34,
+                   '1.21.1': 34, '1.21.2': 42, '1.21.3': 42, '1.21.4': 46, '1.21.5': 55, '1.21.6': 63, '1.21.7': 64, '1.21.8': 64,
+                   '1.21.9': 69, '1.21.10': 69, '1.21.11': 75]
+def pack = packFormats[mcv] ?: 15
+processResources {
+    def props = ['version': project.mod_version, 'mcRange': mcRange, 'loaderMajor': loaderMajor, 'pack': pack,
+                 'loaderId': loaderName, 'mandatory': neo ? 'type = "required"' : 'mandatory = true']
+    inputs.properties props
+    inputs.property 'neoNewToml', neoNewToml
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) { expand props }
+    if (neoNewToml) rename 'mods.toml', 'neoforge.mods.toml'
+}
+tasks.withType(JavaCompile).configureEach {
+    options.release = javaVer; options.encoding = 'UTF-8'
+    if (java8) { sourceCompatibility = '17'; options.compilerArgs += ['-Xlint:-options'] }   // Jabel: modern syntax, Java 8 classes
+}
+tasks.named('test') { enabled = false }
+
+if (project.findProperty('run_java')) tasks.withType(JavaExec).configureEach {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(project.findProperty('run_java') as int) }
+}

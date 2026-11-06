@@ -1,0 +1,161 @@
+# Builds Villager Reroller for every loader and Minecraft version in .github/ports.txt, then starts each one like a
+# player would (real game + loader, joins a local server, opens the menu) and records PASS / FAIL.
+# Runs when branch "ports" is pushed. If .github/ports-only.txt lists "<loader> <mc>" lines, only those run.
+# Results (one text file per build, plus the jars) go to the "port-results" branch.
+name: Build and test all versions
+
+on:
+  push:
+    branches: [ports]
+  workflow_dispatch:
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: m
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          def rows(p):
+              out = []
+              if not os.path.exists(p): return out
+              for l in open(p):
+                  l = l.split('#')[0].split()
+                  if len(l) >= 2: out.append(l)
+              return out
+          only = {(r[0], r[1]) for r in rows('.github/ports-only.txt')}
+          inc = []
+          for r in rows('.github/ports.txt'):
+              loader, mc = r[0], r[1]
+              if only and (loader, mc) not in only: continue
+              fapi = r[2] if len(r) > 2 else mc
+              d = {'fabric': 'ports/fabric', 'fabric26': '.', 'forge': 'ports/forge', 'neoforge': 'ports/forge',
+                   'forge26': 'ports/forge-26', 'neoforge26': 'ports/neoforge-26'}[loader]
+              inc.append({'loader': loader, 'mc': mc, 'fapi': fapi, 'dir': d, 'id': f"{loader.replace('26','')}-{mc}"})
+          print('matrix=' + json.dumps({'include': inc}))
+          PY
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v4
+        if: matrix.loader == 'fabric26'
+        with:
+          gradle-version: "9.6.0"
+      - name: Find the loader / Fabric API version
+        id: v
+        run: |
+          mc="${{ matrix.mc }}"
+          LOOM=$(curl -s https://maven.architectury.dev/dev/architectury/loom/dev.architectury.loom.gradle.plugin/maven-metadata.xml | grep -o "<latest>[^<]*</latest>" | sed 's/<[^>]*>//g')
+          FORGE=$(curl -s https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml | grep -o "<version>$mc-[^<]*</version>" | sed "s/<[^>]*>//g; s/^$mc-//" | tail -1)
+          case "${{ matrix.loader }}" in
+            forge) echo "args=-Pforge_version=$FORGE -Parch_loom_version=$LOOM" >> "$GITHUB_OUTPUT"; echo "Forge $FORGE, Loom $LOOM" ;;
+            forge26) echo "args=-Pforge_version=$FORGE" >> "$GITHUB_OUTPUT"; echo "Forge $FORGE" ;;
+            neoforge) P=$(echo "$mc" | sed 's/^1\.//'); case "$P" in *.*) ;; *) P="$P.0" ;; esac
+                F=$(curl -s https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml | grep -oE "<version>$P\.[0-9]+(-beta)?</version>" | sed 's/<[^>]*>//g' | sort -V | tail -1)
+                echo "args=-Ploom.platform=neoforge -Pforge_version=$F -Parch_loom_version=$LOOM" >> "$GITHUB_OUTPUT"; echo "NeoForge $F" ;;
+            neoforge26) P="$mc"; case "$P" in *.*.*) ;; *) P="$P.0" ;; esac
+                F=$(curl -s https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml | grep -oE "<version>$P\.[0-9]+(-beta)?</version>" | sed 's/<[^>]*>//g' | sort -V | tail -1)
+                echo "args=-Pneo_version=$F" >> "$GITHUB_OUTPUT"; echo "NeoForge $F" ;;
+            *) V=$(curl -s https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml | grep -oE "<version>[^<]*\+(build\.[0-9]+-)?${{ matrix.fapi }}</version>" | sed 's/<[^>]*>//g' | tail -1)
+                echo "Fabric API $V"
+                if [ "${{ matrix.loader }}" = fabric26 ]; then echo "args=-Pfabric_version=$V" >> "$GITHUB_OUTPUT"; else echo "args=-Pfabric_api_version=$V" >> "$GITHUB_OUTPUT"; fi ;;
+          esac
+      - name: Build
+        working-directory: ${{ matrix.dir }}
+        run: |
+          set -o pipefail
+          case "${{ matrix.loader }}" in *26) export JAVA_HOME="$JAVA_HOME_25_X64" ;; *) export JAVA_HOME="$JAVA_HOME_21_X64" ;; esac
+          if [ "${{ matrix.loader }}" = fabric26 ]; then G=gradle; else chmod +x gradlew; G=./gradlew; fi
+          $G build -x test --no-daemon -Pminecraft_version=${{ matrix.mc }} ${{ steps.v.outputs.args }} 2>&1 | tee build.log
+      - name: Pick the jar
+        id: jar
+        if: success()
+        run: |
+          mkdir -p result/jars
+          for f in ${{ matrix.dir }}/build/libs/*.jar; do case "$f" in *-sources.jar|*-dev.jar|*-dev-shadow.jar|*-slim.jar) ;; *) cp "$f" result/jars/ ;; esac; done
+          ls -la result/jars
+          echo "file=$(ls result/jars/*.jar | head -1)" >> "$GITHUB_OUTPUT"
+      - name: Launch test
+        if: success()
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb mesa-utils libgl1-mesa-dri libglx-mesa0 mesa-vulkan-drivers libvulkan1 imagemagick xdotool libopenal1 > /dev/null
+          pip install -q portablemc
+          L="${{ matrix.loader }}"; L="${L%26}"
+          mkdir -p lt
+          bash tools/ci/launch_test.sh "${{ steps.jar.outputs.file }}" "${{ matrix.mc }}" lt "$L"
+      - name: Write the result
+        if: always()
+        run: |
+          mkdir -p result
+          R="result/${{ matrix.id }}.txt"
+          if [ -f lt/result.txt ]; then
+            { echo "BUILD OK $(ls result/jars 2>/dev/null)"; cat lt/result.txt; } > "$R"
+          elif [ -f ${{ matrix.dir }}/build.log ]; then
+            { echo "BUILD FAILED"; python3 - ${{ matrix.dir }}/build.log <<'PY'
+          import re, sys
+          L = open(sys.argv[1], errors='replace').read().split('\n'); out = []; seen = set()
+          for i, l in enumerate(L):
+              m = re.search(r'/(\S+?\.java):(\d+): error: (.*)', l)
+              if not m: continue
+              sym = ''
+              for k in range(i + 1, min(i + 6, len(L))):
+                  if 'symbol:' in L[k]: sym = L[k].strip(); break
+              code = L[i + 1].strip() if i + 1 < len(L) else ''
+              key = (m.group(1), m.group(3), sym)
+              if key in seen: continue
+              seen.add(key); out.append(f"{m.group(1).split('/')[-1]}:{m.group(2)} {m.group(3)} | {sym} | {code[:150]}")
+          if not out:
+              for i, l in enumerate(L):
+                  if 'What went wrong' in l: out += [x for x in L[i:i + 16] if x.strip()]
+          print('\n'.join(out[:120]))
+          PY
+            } > "$R"
+          else
+            echo "FAILED before building" > "$R"
+          fi
+          cat "$R" | head -60
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: result-${{ matrix.id }}
+          path: result/
+
+  collect:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: result-*
+          merge-multiple: true
+          path: out
+      - name: Push results
+        run: |
+          cd out
+          git init -q -b port-results
+          git config user.name ci; git config user.email ci@example.com
+          echo "${GITHUB_SHA}" > COMMIT
+          { for f in *.txt; do echo "$(basename "$f" .txt): $(sed -n 2p "$f" | cut -c1-120) [$(head -1 "$f" | cut -c1-12)]"; done; } > SUMMARY
+          git add -A; git commit -qm "results for ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" port-results

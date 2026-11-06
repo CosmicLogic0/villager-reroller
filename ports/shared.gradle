@@ -1,0 +1,135 @@
+// Shared by every multi-version build in ports/ (Fabric 1.15.2-1.21.11, Forge, NeoForge).
+//
+// The mod's code lives once, in ports/src (plus the pure-Java logic from ../src/main/java). Lines that differ
+// between Minecraft versions are wrapped in comment blocks that this file resolves per build:
+//
+//   //#if MC >= 1.20.5 && !FORGE
+//   ...newer code...
+//   //#elif MC >= 1.17
+//   ...
+//   //#else
+//   ...oldest code...
+//   //#endif
+//
+// Terms: MC <op> <version> (op: >= > <= < == !=), FABRIC, FORGE, NEOFORGE, JAVA8; "!" negates a term;
+// "&&" binds tighter than "||". Inactive lines are blanked so compiler line numbers stay the same.
+
+ext.vrVer = { String v -> (v.tokenize('.').collect { it as int } + [0, 0, 0]).take(3) }
+ext.vrCmp = { String a, String b ->
+    def x = vrVer(a), y = vrVer(b)
+    for (int i = 0; i < 3; i++) { if (x[i] != y[i]) return x[i] <=> y[i] }
+    0
+}
+
+ext.vrEval = { String expr, Map ctx ->
+    expr.split(/\|\|/).any { String alt ->
+        alt.split(/&&/).every { String raw ->
+            def t = raw.trim(); boolean neg = false
+            while (t.startsWith('!')) { neg = !neg; t = t.substring(1).trim() }
+            boolean v
+            def m = (t =~ /^MC\s*(>=|<=|==|!=|>|<)\s*([0-9.]+)$/)
+            if (m.matches()) {
+                int c = vrCmp(ctx.mc as String, m.group(2))
+                switch (m.group(1)) {
+                    case '>=': v = c >= 0; break
+                    case '<=': v = c <= 0; break
+                    case '>':  v = c > 0; break
+                    case '<':  v = c < 0; break
+                    case '==': v = c == 0; break
+                    default:   v = c != 0
+                }
+            } else if (ctx.containsKey(t)) {
+                v = ctx[t] as boolean
+            } else {
+                throw new GradleException("vr preprocessor: unknown term '" + t + "' in '" + expr + "'")
+            }
+            neg ? !v : v
+        }
+    }
+}
+
+// Java 8 (Minecraft 1.15/1.16): turn each one-line `record Name(A a, B b) {` into an ordinary final class.
+ext.vrRecordToClass = { String l ->
+    def m = (l =~ /^(\s*)((?:public |private |protected )?)(?:static )?record (\w+)\((.*?)\)\s*\{(.*)$/)
+    if (!m.find()) return l
+    String ind = m.group(1), vis = m.group(2), name = m.group(3), rest = m.group(5)
+    def comps = m.group(4).split(',').collect { it.trim() }.findAll { it }
+    def sb = new StringBuilder()
+    sb << ind << vis << (ind.length() > 0 ? 'static ' : '') << "final class ${name} {"
+    comps.each { sb << " public final ${it};" }
+    sb << " public ${name}(" << comps.join(', ') << ") {"
+    comps.each { c -> def n = c.split(/\s+/)[-1]; sb << " this.${n} = ${n};" }
+    sb << " }"
+    comps.each { c -> def ps = c.split(/\s+/); def n = ps[-1]; sb << " public ${ps[0..-2].join(' ')} ${n}() { return ${n}; }" }
+    sb << ' ' << rest
+    sb.toString()
+}
+
+// Resolves the //#if blocks of one file.
+ext.vrPreprocess = { String text, Map ctx ->
+    def out = new StringBuilder()
+    def stack = []                // each: [active, anyTaken, parentActive]
+    boolean active = true
+    text.eachLine { String line ->
+        def t = line.trim()
+        if (t.startsWith('//#if ')) {
+            boolean c = vrEval(t.substring(6), ctx)
+            stack << [active, c]
+            active = active && c
+            out << '\n'; return
+        }
+        if (t.startsWith('//#elif ')) {
+            def top = stack[-1]
+            boolean parent = top[0]
+            boolean c = !top[1] && vrEval(t.substring(8), ctx)
+            if (c) top[1] = true
+            active = parent && c
+            out << '\n'; return
+        }
+        if (t == '//#else') {
+            def top = stack[-1]
+            active = top[0] && !top[1]
+            top[1] = true
+            out << '\n'; return
+        }
+        if (t == '//#endif') {
+            def top = stack.pop()
+            active = top[0]
+            out << '\n'; return
+        }
+        if (!active) { out << '\n'; return }
+        def l = line
+        if (ctx.JAVA8) l = vrRecordToClass(l)
+        if (ctx.REPLACE) ctx.REPLACE.each { a, b -> l = l.replace(a, b) }
+        if (ctx.RELOCATE) l = l.replace('net.fabricmc.', 'dev.villagerreroller.fabricshim.')
+        out << l << '\n'
+    }
+    if (!stack.isEmpty()) throw new GradleException('vr preprocessor: unclosed //#if')
+    out.toString()
+}
+
+// Copies java sources into `into`, resolving the //#if blocks. Each entry of `dirs` is a folder, or
+// [folder, 'only/this/prefix'] to take just part of it. The first folder that has a file wins.
+ext.vrGenerate = { List dirs, File into, Map ctx ->
+    project.delete(into)
+    dirs.each { d ->
+        def dir = d instanceof List ? d[0] : d
+        def prefix = d instanceof List ? d[1] : ''
+        def root = project.file(dir)
+        if (!root.exists()) return
+        root.eachFileRecurse(groovy.io.FileType.FILES) { File f ->
+            if (!f.name.endsWith('.java')) return
+            def rel = root.toPath().relativize(f.toPath()).toString().replace('\\', '/')
+            if (!rel.startsWith(prefix)) return
+            def dest = new File(into, rel)
+            if (dest.exists()) return
+            dest.parentFile.mkdirs()
+            dest.text = vrPreprocess(f.getText('UTF-8'), ctx)
+        }
+    }
+}
+
+// Java each Minecraft version runs on.
+ext.vrJavaFor = { String mcv ->
+    vrCmp(mcv, '1.20.5') >= 0 ? 21 : vrCmp(mcv, '1.18') >= 0 ? 17 : vrCmp(mcv, '1.17') >= 0 ? 16 : 8
+}

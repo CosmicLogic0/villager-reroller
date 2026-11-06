@@ -1,0 +1,61 @@
+// Villager Reroller for Fabric on Minecraft 1.15.2 - 1.21.11 (the versions that still use obfuscated names).
+// The code is ../src/common (+ ../src/fabric for the Fabric entry) and the pure-Java logic of the main mod;
+// //#if blocks in it are resolved for the Minecraft version being built (see ../shared.gradle).
+plugins {
+    id 'fabric-loom' version "${loom_version}"
+}
+
+apply from: '../shared.gradle'
+def mcv = project.minecraft_version as String
+def javaVer = (project.findProperty('java_version') ?: vrJavaFor(mcv)) as int
+def java8 = javaVer < 16
+
+version = "${project.mod_version}+fabric-${mcv}"
+group = 'dev.villagerreroller'
+base { archivesName = 'villager-reroller' }
+
+repositories { mavenCentral() }
+
+dependencies {
+    minecraft "com.mojang:minecraft:${mcv}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    if (java8) { annotationProcessor 'com.pkware.jabel:jabel-javac-plugin:1.0.1-1'; compileOnly 'com.pkware.jabel:jabel-javac-plugin:1.0.1-1' }
+}
+
+def gen = layout.buildDirectory.dir('gen-src').get().asFile
+def ctx = [mc: mcv, FABRIC: true, FORGE: false, NEOFORGE: false, JAVA8: java8, RELOCATE: false]
+tasks.register('vrSources') {
+    inputs.dir('../src'); inputs.dir('../../src/main/java/dev/villagerreroller/logic'); inputs.property('ctx', ctx.toString())
+    outputs.dir(gen)
+    doLast { vrGenerate(['../src/fabric', '../src/common', ['../../src/main/java', 'dev/villagerreroller/logic/']], gen, ctx) }
+}
+sourceSets.main.java.srcDirs = [gen]
+// icon + language file from the main mod
+def assets = layout.buildDirectory.dir('assets-res')
+tasks.register('vrAssets', Sync) { from('../../src/main/resources') { include 'assets/**' }; into assets }
+sourceSets.main.resources.srcDirs = ['src/res', assets]
+compileJava.dependsOn 'vrSources'
+processResources.dependsOn 'vrAssets'
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn 'vrSources', 'vrAssets' }
+
+// Fabric API's mod id was "fabric" up to 1.19.2, "fabric-api" after.
+def fapi = vrCmp(mcv, '1.19.2') <= 0 ? 'fabric' : 'fabric-api'
+def mcdep = project.findProperty('mc_dep') ?: mcv
+processResources {
+    filesMatching('fabric.mod.json') { expand 'version': project.version, 'mcdep': mcdep, 'java': javaVer, 'fapi': fapi }
+    inputs.property 'v', "${project.version} ${mcdep} ${javaVer} ${fapi}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = javaVer
+    if (java8) { sourceCompatibility = '17'; options.compilerArgs += ['-Xlint:-options'] }   // Jabel: modern syntax, Java 8 classes
+}
+tasks.named('test') { enabled = false }
+
+// Launch tests: start the game on the Java that Minecraft version really uses
+if (project.findProperty('run_java')) tasks.withType(JavaExec).configureEach {
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(project.findProperty('run_java') as int) }
+}

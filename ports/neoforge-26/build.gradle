@@ -1,0 +1,43 @@
+// Villager Reroller for NeoForge on Minecraft 26.x: the main (Fabric) mod's code, with small stand-ins for the
+// Fabric API classes it uses (../src/shim26) backed by NeoForge's events. Stand-ins live in our own package.
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+apply from: '../shared.gradle'
+def mcv = project.minecraft_version as String
+version = "${project.mod_version}+neoforge-${mcv}"
+group = 'dev.villagerreroller'
+base { archivesName = 'villager-reroller' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+
+neoForge {
+    version = project.neo_version
+    runs { client { client() } }
+    mods { villagerreroller { sourceSet(sourceSets.main) } }
+}
+
+def gen = layout.buildDirectory.dir('gen-src').get().asFile
+def ctx = [mc: '1.99', FABRIC: false, FORGE: false, NEOFORGE: true, JAVA8: false, RELOCATE: true,
+           REPLACE: ['import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;': 'import net.minecraft.commands.CommandSourceStack;',
+                     'FabricClientCommandSource': 'CommandSourceStack']]
+tasks.register('vrSources') {
+    inputs.dir('../src/shim26'); inputs.dir('../../src/main/java'); outputs.dir(gen)
+    doLast { vrGenerate(['../src/shim26', '../../src/main/java'], gen, ctx) }
+}
+def res = layout.buildDirectory.dir('gen-res')
+def mcRange = project.findProperty('mc_range') ?: "[${mcv}]"
+tasks.register('vrResources', Sync) {
+    from('../../src/main/resources') { include 'assets/**' }
+    from('src/res')
+    into res
+    inputs.property 'v', "${project.mod_version} ${mcRange}"
+    filesMatching('META-INF/neoforge.mods.toml') { expand 'version': project.mod_version, 'mcRange': mcRange }
+}
+sourceSets.main.java.srcDirs = [gen]
+sourceSets.main.resources.srcDirs = [res]
+compileJava.dependsOn 'vrSources'
+processResources.dependsOn 'vrResources'
+tasks.matching { it.name in ['sourcesJar', 'neoForgeIdeSync'] }.configureEach { dependsOn 'vrSources', 'vrResources' }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 25 }
