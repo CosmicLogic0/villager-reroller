@@ -36,10 +36,34 @@ for i in $(seq 1 90); do sleep 4; grep -q 'Done (' "$S/server.log" && break; don
 grep -q 'Done (' "$S/server.log" || { cp "$S/server.log" game.log; fail "the test server for $gv did not start"; }
 echo "server up"
 
+# Minecraft 1.16.4 - 1.18.2 crash at start-up when Mojang's services answer "401" to an offline player (the
+# privileges check isn't caught there). Point those versions at a tiny local stand-in that says "all allowed".
+extra=""
+case "$gv" in 1.16.4|1.16.5|1.17|1.17.*|1.18|1.18.*)
+  cat > fake_services.py <<'PY'
+import http.server, json
+BODY = json.dumps({"privileges": {"onlineChat": {"enabled": True}, "multiplayerServer": {"enabled": True},
+                   "multiplayerRealms": {"enabled": True}, "telemetry": {"enabled": False}},
+                   "profanityFilterPreferences": {"profanityFilterOn": False}, "banStatus": {"bannedScopes": {}}}).encode()
+class H(http.server.BaseHTTPRequestHandler):
+    def reply(self):
+        self.send_response(200); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(BODY))); self.end_headers(); self.wfile.write(BODY)
+    do_GET = reply; do_POST = reply
+    def log_message(self, *a): pass
+http.server.ThreadingHTTPServer(("127.0.0.1", 8099), H).serve_forever()
+PY
+  (timeout 1200 python3 fake_services.py > /dev/null 2>&1 &)
+  sleep 1
+  H=http://127.0.0.1:8099
+  extra=",-Dminecraft.api.auth.host=$H,-Dminecraft.api.account.host=$H,-Dminecraft.api.session.host=$H,-Dminecraft.api.services.host=$H"
+  echo "using local stand-in for Mojang services" ;;
+esac
+
 # game options: no first-launch screens, keep running without focus
 printf 'onboardAccessibility:false\nskipMultiplayerWarning:true\njoinedFirstServer:true\npauseOnLostFocus:false\ntutorialStep:none\nrenderDistance:6\nguiScale:2\nnarrator:0\nsoundCategory_master:0.0\n' > "$G/options.txt"
 (timeout 900 xvfb-run -n 99 -s "-screen 0 1280x720x24 +extension GLX +render -noreset -ac" \
-   portablemc --main-dir "$G" start --jvm-policy mojang-then-system -u Tester --join-server 127.0.0.1 --join-server-port 25565 "$spec" --jvm-arg=-Xmx3G,-Dvillagerreroller.selftest=true --resolution 1280x720 > game.log 2>&1 &)
+   portablemc --main-dir "$G" start --jvm-policy mojang-then-system -u Tester --join-server 127.0.0.1 --join-server-port 25565 "$spec" --jvm-arg=-Xmx3G,-Dvillagerreroller.selftest=true$extra --resolution 1280x720 > game.log 2>&1 &)
 
 loaded=0; done_=0; shot=0
 for i in $(seq 1 170); do

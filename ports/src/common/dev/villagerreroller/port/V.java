@@ -129,6 +129,15 @@ public final class V {
         //#endif
     }
 
+    /** The block the entity stands in. */
+    public static net.minecraft.core.BlockPos feet(Entity e) {
+        //#if MC >= 1.16
+        return e.blockPosition();
+        //#else
+        return new net.minecraft.core.BlockPos(e);
+        //#endif
+    }
+
     public static double blockReach(Minecraft mc, LocalPlayer p) {
         //#if MC >= 1.20.5
         return p.blockInteractionRange();

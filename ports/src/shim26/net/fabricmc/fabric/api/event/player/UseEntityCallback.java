@@ -29,7 +29,7 @@ public interface UseEntityCallback {
             if (!hooked) {
                 hooked = true;
                 //#if FORGE
-                PlayerInteractEvent.EntityInteract.BUS.addListener(e -> {
+                PlayerInteractEvent.EntityInteractSpecific.BUS.addListener(e -> {
                     fire(e.getEntity(), e.getLevel(), e.getHand(), e.getTarget());
                 });
                 //#else

@@ -177,7 +177,7 @@ public final class VillagerRerollerClient {
                         dev.villagerreroller.logic.DayCycle.villagersResting(t),
                         dev.villagerreroller.game.GameActions.isSleeping(mc.player));
                 dev.villagerreroller.game.GameActions.releaseMovement(mc);
-                float prog = dev.villagerreroller.game.GameActions.destroyProgress(mc, mc.player, mc.player.blockPosition().below());
+                float prog = dev.villagerreroller.game.GameActions.destroyProgress(mc, mc.player, V.feet(mc.player).below());
                 LOGGER.info("VRTEST break progress/tick={}", prog);
                 V.setScreen(mc, null);
             } else if (selftestTicks == 210) {
