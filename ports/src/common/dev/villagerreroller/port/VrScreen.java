@@ -44,7 +44,7 @@ public abstract class VrScreen extends Screen {
 
     protected void dropFocus() {
         //#if MC >= 1.19.4
-        clearFocus();
+        setFocused(null);
         //#else
         setFocused(null);
         //#endif

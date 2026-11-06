@@ -31,7 +31,9 @@ dependencies {
 def gen = layout.buildDirectory.dir('gen-src').get().asFile
 def ctx = [mc: '1.99', FABRIC: false, FORGE: true, NEOFORGE: false, JAVA8: false, RELOCATE: true,
            REPLACE: ['import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;': 'import net.minecraft.commands.CommandSourceStack;',
-                     'FabricClientCommandSource': 'CommandSourceStack']]
+                     'FabricClientCommandSource': 'CommandSourceStack'] +
+                    // Minecraft 26.1.x: the open screen still lives on Minecraft itself, not on mc.gui
+                    (mcv.startsWith('26.1') ? ['.gui.screen()': '.screen', '.gui.setScreen(': '.setScreen('] : [:])]
 tasks.register('vrSources') {
     inputs.dir('../src/shim26'); inputs.dir('../../src/main/java'); outputs.dir(gen)
     doLast { vrGenerate(['../src/shim26', '../../src/main/java'], gen, ctx) }

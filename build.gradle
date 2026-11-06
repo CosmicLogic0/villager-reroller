@@ -24,6 +24,21 @@ dependencies {
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 }
 
+// Minecraft 26.1.x: the open screen still lives on Minecraft itself (mc.screen / mc.setScreen), not on mc.gui.
+// Build from a copy of the sources with those few calls renamed.
+def oldScreenApi = project.minecraft_version.toString().startsWith('26.1')
+if (oldScreenApi) {
+    def gen = layout.buildDirectory.dir('gen-src')
+    tasks.register('oldScreenSources', Sync) {
+        from 'src/main/java'
+        into gen
+        filter { String l -> l.replace('.gui.screen()', '.screen').replace('.gui.setScreen(', '.setScreen(') }
+    }
+    sourceSets.main.java.srcDirs = [gen]
+    compileJava.dependsOn 'oldScreenSources'
+    tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn 'oldScreenSources' }
+}
+
 processResources {
     inputs.property "version", project.version
     inputs.property "mcDep", mcDep
