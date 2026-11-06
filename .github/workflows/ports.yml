@@ -132,6 +132,9 @@ jobs:
             echo "FAILED before building" > "$R"
           fi
           cat "$R" | head -60
+          # also as an annotation, so it can be read while the rest of the run is still going
+          E=$(head -40 "$R" | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          if grep -q '^PASS' "$R"; then echo "::notice title=${{ matrix.id }}::$E"; else echo "::error title=${{ matrix.id }}::$E"; fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

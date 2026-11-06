@@ -93,7 +93,7 @@ ext.vrPreprocess = { String text, Map ctx ->
             out << '\n'; return
         }
         if (t == '//#endif') {
-            def top = stack.pop()
+            def top = stack.remove(stack.size() - 1)   // (Groovy's pop() takes the first element)
             active = top[0]
             out << '\n'; return
         }

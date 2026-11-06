@@ -1,3 +1,8 @@
+## 1.0.0
+- **Every version.** Villager Reroller now runs on Fabric (Minecraft 1.15.2 and 1.16.1 - 26.3), Forge (1.15.2 - 26.3) and NeoForge (1.20.2 - 26.3). Pick the file for your loader and Minecraft version.
+- **Full release.** Each version is started in CI like a player would: the real game and loader, joining a world, opening the menu and starting calibration.
+- On Minecraft 1.15 the `/vr` commands aren't available (that version has no client commands); everything works from the menu (V) and the start/stop key (B). On Forge, `/vr` needs 1.18.2 or newer.
+
 ## 0.3.0-beta.1
 - **New look for the menu.** One clean dark panel with the status at the top, a toolbar (Calibrate, Bed, Night, Sounds, Accept any) and a big Start / Stop button.
 - **Drop-down sections.** Enchantments are sorted into sections (Swords & Axes, Tools, Armor, Boots, Bow...) that open and close with a click. Each section has its own icon and shows how many enchants you want or avoid. "Expand all" and "Collapse all" are at the bottom, and the list scrolls with the mouse wheel.

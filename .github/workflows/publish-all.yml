@@ -1,0 +1,155 @@
+# Publishes every version in .github/ports.txt as a full Release: one GitHub release with all the jars, and one
+# Modrinth + CurseForge version per jar. Runs when branch "publish" is pushed.
+# Needs repository secrets MODRINTH_TOKEN and CURSEFORGE_TOKEN, and the Modrinth project id in .github/modrinth-id.txt.
+# If .github/ports-only.txt lists "<loader> <mc>" lines, only those are uploaded to Modrinth / CurseForge (retries).
+name: Publish all versions
+
+on:
+  push:
+    branches: [publish]
+
+permissions:
+  contents: write
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+      version: ${{ steps.m.outputs.version }}
+      mr: ${{ steps.m.outputs.mr }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: m
+        run: |
+          echo "version=$(grep '^mod_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+          echo "mr=$(grep -v '^#' .github/modrinth-id.txt 2>/dev/null | tr -d ' \r\n')" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          def rows(p):
+              if not os.path.exists(p): return []
+              return [l.split('#')[0].split() for l in open(p) if len(l.split('#')[0].split()) >= 2]
+          only = {(r[0], r[1]) for r in rows('.github/ports-only.txt')}
+          inc = []
+          for r in rows('.github/ports.txt'):
+              loader, mc = r[0], r[1]
+              fapi = r[2] if len(r) > 2 else mc
+              d = {'fabric': 'ports/fabric', 'fabric26': '.', 'forge': 'ports/forge', 'neoforge': 'ports/forge',
+                   'forge26': 'ports/forge-26', 'neoforge26': 'ports/neoforge-26'}[loader]
+              base = loader[:-2] if loader.endswith('26') else loader
+              gv = mc
+              if loader == 'fabric26' and mc == '26.1': gv = '26.1 26.1.1 26.1.2'   # that jar loads on every 26.1.x
+              v = [int(x) for x in mc.split('.')] + [0, 0]
+              java = 25 if mc.startswith('26') else 21 if v[1] > 20 or (v[1] == 20 and v[2] >= 5) else 17 if v[1] >= 18 else 16 if v[1] == 17 else 8
+              inc.append({'loader': loader, 'base': base, 'mc': mc, 'fapi': fapi, 'dir': d, 'id': f"{base}-{mc}", 'gv': gv, 'java': java,
+                          'upload': (not only) or (loader, mc) in only})
+          print('matrix=' + json.dumps({'include': inc}))
+          PY
+
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: ${{ matrix.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v4
+        if: matrix.loader == 'fabric26'
+        with:
+          gradle-version: "9.6.0"
+      - name: Find the loader / Fabric API version
+        id: v
+        run: |
+          mc="${{ matrix.mc }}"
+          LOOM=$(curl -s https://maven.architectury.dev/dev/architectury/loom/dev.architectury.loom.gradle.plugin/maven-metadata.xml | grep -o "<latest>[^<]*</latest>" | sed 's/<[^>]*>//g')
+          FORGE=$(curl -s https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml | grep -o "<version>$mc-[^<]*</version>" | sed "s/<[^>]*>//g; s/^$mc-//" | tail -1)
+          case "${{ matrix.loader }}" in
+            forge) echo "args=-Pforge_version=$FORGE -Parch_loom_version=$LOOM" >> "$GITHUB_OUTPUT" ;;
+            forge26) echo "args=-Pforge_version=$FORGE" >> "$GITHUB_OUTPUT" ;;
+            neoforge) P=$(echo "$mc" | sed 's/^1\.//'); case "$P" in *.*) ;; *) P="$P.0" ;; esac
+                F=$(curl -s https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml | grep -oE "<version>$P\.[0-9]+(-beta)?</version>" | sed 's/<[^>]*>//g' | sort -V | tail -1)
+                echo "args=-Ploom.platform=neoforge -Pforge_version=$F -Parch_loom_version=$LOOM" >> "$GITHUB_OUTPUT" ;;
+            neoforge26) P="$mc"; case "$P" in *.*.*) ;; *) P="$P.0" ;; esac
+                F=$(curl -s https://maven.neoforged.net/releases/net/neoforged/neoforge/maven-metadata.xml | grep -oE "<version>$P\.[0-9]+(-beta)?</version>" | sed 's/<[^>]*>//g' | sort -V | tail -1)
+                echo "args=-Pneo_version=$F" >> "$GITHUB_OUTPUT" ;;
+            *) V=$(curl -s https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml | grep -oE "<version>[^<]*\+(build\.[0-9]+-)?${{ matrix.fapi }}</version>" | sed 's/<[^>]*>//g' | tail -1)
+                if [ "${{ matrix.loader }}" = fabric26 ]; then echo "args=-Pfabric_version=$V" >> "$GITHUB_OUTPUT"; else echo "args=-Pfabric_api_version=$V" >> "$GITHUB_OUTPUT"; fi ;;
+          esac
+      - name: Build
+        working-directory: ${{ matrix.dir }}
+        run: |
+          case "${{ matrix.loader }}" in *26) export JAVA_HOME="$JAVA_HOME_25_X64" ;; *) export JAVA_HOME="$JAVA_HOME_21_X64" ;; esac
+          if [ "${{ matrix.loader }}" = fabric26 ]; then G=gradle; else chmod +x gradlew; G=./gradlew; fi
+          rm -rf build/libs
+          $G build -x test --no-daemon -Pminecraft_version=${{ matrix.mc }} ${{ steps.v.outputs.args }}
+          mkdir -p "$GITHUB_WORKSPACE/jar"
+          for f in build/libs/*.jar; do case "$f" in *-sources.jar|*-dev.jar|*-dev-shadow.jar|*-slim.jar) ;; *) cp "$f" "$GITHUB_WORKSPACE/jar/" ;; esac; done
+          ls -la "$GITHUB_WORKSPACE/jar"
+      - name: Game versions
+        id: gv
+        run: |
+          { echo "list<<EOF"; for v in ${{ matrix.gv }}; do echo "$v"; done; echo "EOF"; } >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jar-${{ matrix.id }}
+          path: jar/
+      - name: Upload to Modrinth
+        if: matrix.upload && needs.plan.outputs.mr != ''
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          modrinth-id: ${{ needs.plan.outputs.mr }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          files: jar/*.jar
+          name: Villager Reroller ${{ needs.plan.outputs.version }} for ${{ matrix.base == 'forge' && 'Forge' || matrix.base == 'neoforge' && 'NeoForge' || 'Fabric' }} ${{ matrix.mc }}
+          version: ${{ needs.plan.outputs.version }}+${{ matrix.id }}
+          version-type: release
+          loaders: ${{ matrix.base }}
+          game-versions: ${{ steps.gv.outputs.list }}
+          java: ${{ matrix.java }}
+          dependencies: ${{ matrix.base == 'fabric' && 'fabric-api(required)' || '' }}
+          changelog-file: CHANGELOG.md
+      - name: Upload to CurseForge
+        if: always() && matrix.upload
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          curseforge-id: 1782710
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: jar/*.jar
+          name: Villager Reroller ${{ needs.plan.outputs.version }} for ${{ matrix.base == 'forge' && 'Forge' || matrix.base == 'neoforge' && 'NeoForge' || 'Fabric' }} ${{ matrix.mc }}
+          version: ${{ needs.plan.outputs.version }}+${{ matrix.id }}
+          version-type: release
+          loaders: ${{ matrix.base }}
+          game-versions: ${{ steps.gv.outputs.list }}
+          java: ${{ matrix.java }}
+          dependencies: ${{ matrix.base == 'fabric' && 'fabric-api(required)' || '' }}
+          changelog-file: CHANGELOG.md
+
+  github:
+    needs: [plan, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: jar-*
+          merge-multiple: true
+          path: jars
+      - run: ls jars | wc -l; ls jars
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ needs.plan.outputs.version }}
+          name: Villager Reroller ${{ needs.plan.outputs.version }} (Fabric, Forge, NeoForge; Minecraft 1.15.2 - 26.3)
+          prerelease: false
+          make_latest: "true"
+          body_path: CHANGELOG.md
+          files: jars/*.jar

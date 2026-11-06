@@ -53,10 +53,12 @@ public final class VillagerRerollerClient implements ClientModInitializer {
 
         // 26.x key binding setup: a registered category and KeyMappingHelper (checked against a mod that builds on 26.3).
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
+        // the keyboard input type: called KEYSYM before 26.3 and KEYBOARD after, always the first one
+        InputConstants.Type keyboard = InputConstants.Type.values()[0];
         KeyMapping menuKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.villagerreroller.menu", InputConstants.Type.KEYBOARD, InputConstants.KEY_V, category));
+                "key.villagerreroller.menu", keyboard, InputConstants.KEY_V, category));
         KeyMapping toggleKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.villagerreroller.toggle", InputConstants.Type.KEYBOARD, InputConstants.KEY_B, category));
+                "key.villagerreroller.toggle", keyboard, InputConstants.KEY_B, category));
 
         ClientTickEvents.END_CLIENT_TICK.register(mc -> {
             while (menuKey.consumeClick()) {
