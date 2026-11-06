@@ -3,7 +3,7 @@
 # built jar in the mods folder, joins a local vanilla server, and reads the mod's VRTEST log lines.
 # usage: launch_test.sh <jar> <game version> <result dir> [loader: fabric (default) | forge | neoforge]
 set -u
-jar="$1"; gv="$2"; out="$3"; loader="${4:-fabric}"
+jar="$1"; gv="$2"; out="$3"; loader="${4:-fabric}"; lv="${5:-}"   # lv: exact Forge / NeoForge version (fallback)
 mkdir -p "$out"; R="$out/result.txt"
 G="$PWD/game"; mkdir -p "$G/mods"
 cp "$jar" "$G/mods/"
@@ -22,7 +22,12 @@ echo "Launching $spec with $(basename "$jar")"; ls "$G/mods"
 export LIBGL_ALWAYS_SOFTWARE=1
 # install first (downloads the game, libraries, Java), then start
 ok=0; for i in 1 2 3; do portablemc --main-dir "$G" start --dry --jvm-policy mojang-then-system "$spec" > install.log 2>&1 && { ok=1; break; }; sleep 20; done
-[ "$ok" = 1 ] || { cp install.log game.log; fail "the launcher could not install $spec"; }
+if [ "$ok" != 1 ] && [ -n "$lv" ]; then
+  # no stable loader build for this Minecraft version (e.g. only NeoForge betas): name the exact one
+  spec="$loader::$lv"; echo "retrying with $spec"
+  for i in 1 2; do portablemc --main-dir "$G" start --dry --jvm-policy mojang-then-system "$spec" > install.log 2>&1 && { ok=1; break; }; sleep 20; done
+fi
+[ "$ok" = 1 ] || { cp install.log game.log; fail "the launcher could not install $spec: $(tail -n 5 install.log | tr '\n' ' ')"; }
 
 # --- a local vanilla server (offline, creative, flat) for the game to join ---
 S="$PWD/server"; mkdir -p "$S"
