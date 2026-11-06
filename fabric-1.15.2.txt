@@ -1,0 +1,12 @@
+BUILD OK villager-reroller-1.0.0+fabric-1.15.2.jar
+PASS: fabric 1.15.2, mod loaded, joined a world, menu opened, calibration and start-guard work
+[16:27:00] [main] [INFO] VRTEST loaded (Villager Reroller initialised, 0 saved rules)
+[16:27:15] [main] [INFO] VRTEST joining 127.0.0.1:25565
+[16:27:16] [main] [INFO] VRTEST in world
+[16:27:19] [main] [INFO] VRTEST menu shot
+[16:27:26] [main] [INFO] VRTEST menu open=true enchants=37
+[16:27:26] [main] [INFO] VRTEST clock time=706 resting=false sleeping=false
+[16:27:26] [main] [INFO] VRTEST break progress/tick=0.055555556
+[16:27:26] [main] [INFO] VRTEST calibration step=WAIT_PLACE
+[16:27:26] [main] [INFO] VRTEST start-without-calibration refused=true
+[16:27:27] [main] [INFO] VRTEST done
