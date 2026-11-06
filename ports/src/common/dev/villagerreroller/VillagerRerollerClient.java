@@ -81,8 +81,35 @@ public final class VillagerRerollerClient {
         CALIBRATION.tick(mc);
         CONTROLLER.tick(mc);
         if (SELFTEST) {
+            selftestJoin(mc);
             selftestTick(mc);
         }
+    }
+
+    /**
+     * CI only, Minecraft 1.15 - 1.17: those versions crash if told to join a server while still loading,
+     * so the launch test passes -Dvillagerreroller.selftest.join=host:port and the mod joins from the title screen.
+     */
+    private static final String SELFTEST_JOIN = System.getProperty("villagerreroller.selftest.join");
+    private static int titleTicks;
+
+    private static void selftestJoin(Minecraft mc) {
+        if (SELFTEST_JOIN == null || titleTicks < 0 || !(V.screen(mc) instanceof net.minecraft.client.gui.screens.TitleScreen)) {
+            return;
+        }
+        if (++titleTicks < 60) {
+            return;
+        }
+        titleTicks = -1;
+        String host = SELFTEST_JOIN.substring(0, SELFTEST_JOIN.lastIndexOf(':'));
+        int port = Integer.parseInt(SELFTEST_JOIN.substring(SELFTEST_JOIN.lastIndexOf(':') + 1));
+        LOGGER.info("VRTEST joining " + host + ":" + port);
+        //#if MC >= 1.17 && MC < 1.18
+        net.minecraft.client.gui.screens.ConnectScreen.startConnecting(V.screen(mc), mc,
+                new net.minecraft.client.multiplayer.resolver.ServerAddress(host, port), null);
+        //#elif MC < 1.17
+        V.setScreen(mc, new net.minecraft.client.gui.screens.ConnectScreen(V.screen(mc), mc, host, port));
+        //#endif
     }
 
     /** A right-click on a block. @return true to cancel it (recording your bed during the day shouldn't try to sleep). */

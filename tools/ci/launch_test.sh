@@ -65,10 +65,14 @@ PY
   echo "using local stand-in for Mojang services" ;;
 esac
 
+# Minecraft 1.15 - 1.17 crash when told to join a server while still loading: the mod joins from the title screen
+join="--join-server 127.0.0.1 --join-server-port 25565"
+[ "$loader" = fabric ] && case "$gv" in 1.15*|1.16*|1.17*) join=""; extra="$extra,-Dvillagerreroller.selftest.join=127.0.0.1:25565" ;; esac
+
 # game options: no first-launch screens, keep running without focus
 printf 'onboardAccessibility:false\nskipMultiplayerWarning:true\njoinedFirstServer:true\npauseOnLostFocus:false\ntutorialStep:none\nrenderDistance:6\nguiScale:2\nnarrator:0\nsoundCategory_master:0.0\n' > "$G/options.txt"
 (timeout 900 xvfb-run -n 99 -s "-screen 0 1280x720x24 +extension GLX +render -noreset -ac" \
-   portablemc --main-dir "$G" start --jvm-policy mojang-then-system -u Tester --join-server 127.0.0.1 --join-server-port 25565 "$spec" --jvm-arg=-Xmx3G,-Dvillagerreroller.selftest=true$extra --resolution 1280x720 > game.log 2>&1 &)
+   portablemc --main-dir "$G" start --jvm-policy mojang-then-system -u Tester $join "$spec" --jvm-arg=-Xmx3G,-Dvillagerreroller.selftest=true$extra --resolution 1280x720 > game.log 2>&1 &)
 
 loaded=0; done_=0; shot=0
 for i in $(seq 1 170); do
