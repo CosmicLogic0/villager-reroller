@@ -1,0 +1,2 @@
+# upload only these to Modrinth / CurseForge (first a single test upload)
+fabric26 26.3
