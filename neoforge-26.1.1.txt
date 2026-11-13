@@ -1,0 +1,12 @@
+BUILD OK villager-reroller-1.0.1+neoforge-26.1.1.jar
+PASS: neoforge 26.1.1, mod loaded, joined a world, menu opened, calibration and start-guard work, Logic Survival in the server list
+[19:18:19] [modloading-worker-0] [INFO] VRTEST loaded (Villager Reroller initialised, 0 saved rules)
+[19:18:28] [Render thread] [INFO] VRTEST in world
+[19:18:31] [Render thread] [INFO] VRTEST menu shot
+[19:18:48] [Render thread] [INFO] VRTEST menu open=true enchants=40
+[19:18:48] [Render thread] [INFO] VRTEST creator server in list=true
+[19:18:48] [Render thread] [INFO] VRTEST clock time=931 resting=false sleeping=false
+[19:18:48] [Render thread] [INFO] VRTEST break progress/tick=0.055555556
+[19:18:48] [Render thread] [INFO] VRTEST calibration step=WAIT_PLACE
+[19:18:48] [Render thread] [INFO] VRTEST start-without-calibration refused=true
+[19:18:48] [Render thread] [INFO] VRTEST done
