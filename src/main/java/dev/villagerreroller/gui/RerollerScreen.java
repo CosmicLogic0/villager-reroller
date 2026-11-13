@@ -3,6 +3,8 @@ package dev.villagerreroller.gui;
 import dev.villagerreroller.VillagerRerollerClient;
 import dev.villagerreroller.config.ConfigIO;
 import dev.villagerreroller.game.EnchantCatalog;
+import dev.villagerreroller.game.Msg;
+import dev.villagerreroller.logic.CreatorServer;
 import dev.villagerreroller.logic.EnchantGroups;
 import dev.villagerreroller.logic.EnchantInfo;
 import dev.villagerreroller.logic.EnchantRule;
@@ -35,7 +37,7 @@ import java.util.Map;
  *
  *   [book] Villager Reroller                         [Start] [x]
  *          * Calibrated. Ready.
- *   [Calibrate] [Bed] [Night] [Sounds] [Accept any]
+ *   [Calibrate] [Bed] [Night] [Sounds] [Server] [Accept any]
  *   [search......] [Show: All] [Want all] [Avoid all] [Clear]
  *   v [sword] Swords & Axes                    2 wanted   7
  *       [icon] Sharpness     [Want] [Max V]  - 150% [emerald] 25 +
@@ -147,8 +149,12 @@ public final class RerollerScreen extends Screen {
         listBottom = py + ph - 18;
     }
 
+    /** Is the Logic Survival server in the player's Multiplayer list? (checked when the menu opens) */
+    private boolean serverInList;
+
     @Override
     protected void init() {
+        serverInList = CreatorServer.added(ConfigIO.gameDir());
         catalog = EnchantCatalog.tradeable(Minecraft.getInstance());
         layout();
         int searchW = Math.max(60, iw - (62 + 58 + 58 + 48 + 4 * 6));
@@ -243,7 +249,7 @@ public final class RerollerScreen extends Screen {
     private void drawToolbar(GuiGraphicsExtractor g, int mx, int my, RerollerConfig cfg) {
         Minecraft mc = Minecraft.getInstance();
         var cal = VillagerRerollerClient.CALIBRATION;
-        int bw = (iw - 4 * 6 - 100) / 4; // the last button ("Accept any") gets 100
+        int bw = (iw - 5 * 6 - 100) / 5; // the last button ("Accept any") gets 100
         int x = ix;
         int y = toolbarY;
 
@@ -268,6 +274,17 @@ public final class RerollerScreen extends Screen {
 
         toggle(g, mx, my, x, y, bw, "Sounds", cfg.sounds, true, b -> cfg.sounds = !cfg.sounds,
                 tip("Sounds: " + (cfg.sounds ? "ON" : "OFF"), "A chime when rerolling starts, a low note when it", "stops, and a fanfare when your book is found."));
+        x += bw + 6;
+
+        toggle(g, mx, my, x, y, bw, "Server", serverInList, true, b -> {
+            String msg = CreatorServer.add(ConfigIO.gameDir());
+            serverInList = CreatorServer.added(ConfigIO.gameDir());
+            Msg.info(mc, msg);
+        }, serverInList
+                ? tip("Logic Survival: in your servers", "The survival server run by the maker of this mod",
+                        "(" + CreatorServer.IP + "). It's in your Multiplayer list;", "delete it there if you don't want it.")
+                : tip("Add Logic Survival", "The survival server run by the maker of this mod",
+                        "(" + CreatorServer.IP + "). Click to add it to the end", "of your Multiplayer list. Delete it there any time."));
         x += bw + 6;
 
         toggle(g, mx, my, x, y, iw - (x - ix), "Accept any", cfg.acceptAnyNotAvoided, true,

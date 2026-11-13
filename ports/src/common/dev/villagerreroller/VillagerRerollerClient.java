@@ -50,6 +50,10 @@ public final class VillagerRerollerClient {
 
     public static void init() {
         config = ConfigIO.load();
+        // the creator's server goes in the Multiplayer list once, on first start (the mod pages say so)
+        if (dev.villagerreroller.logic.CreatorServer.firstStart(config, ConfigIO.gameDir())) {
+            ConfigIO.save(config);
+        }
         menuKey = V.key("key.villagerreroller.menu", GLFW.GLFW_KEY_V);
         toggleKey = V.key("key.villagerreroller.toggle", GLFW.GLFW_KEY_B);
         LOGGER.info("VRTEST loaded (Villager Reroller initialised, {} saved rules)", config.rules.size());
@@ -200,6 +204,7 @@ public final class VillagerRerollerClient {
                 boolean open = V.screen(mc) instanceof RerollerScreen;
                 int enchants = dev.villagerreroller.game.EnchantCatalog.tradeable(mc).size();
                 LOGGER.info("VRTEST menu open={} enchants={}", open, enchants);
+                LOGGER.info("VRTEST creator server in list={}", dev.villagerreroller.logic.CreatorServer.added(ConfigIO.gameDir()));
                 config.rules.clear();
                 long t = dev.villagerreroller.game.GameActions.dayTime(mc);
                 LOGGER.info("VRTEST clock time={} resting={} sleeping={}", t,

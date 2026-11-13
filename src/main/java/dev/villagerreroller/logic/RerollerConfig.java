@@ -47,6 +47,9 @@ public final class RerollerConfig {
     /** At night villagers go to bed instead of taking jobs: pause, sleep in the calibrated bed, then carry on. */
     public boolean handleNight = true;
 
+    /** The Logic Survival server was put in the Multiplayer list once (on first start) - never again after that. */
+    public boolean serverOffered = false;
+
     public PriceModel priceModel = new PriceModel();
 
     public EnchantRule rule(String id) {

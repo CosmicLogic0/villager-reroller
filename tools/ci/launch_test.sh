@@ -120,4 +120,6 @@ fi
 grep -q "VRTEST menu open=true enchants=[1-9]" game.log || fail "the menu did not open or listed no enchantments: $(grep -m1 'VRTEST menu' game.log)"
 grep -q "VRTEST start-without-calibration refused=true" game.log || fail "starting without calibration was not refused"
 grep -q "VRTEST calibration step=WAIT_PLACE" game.log || fail "calibration did not start"
-{ echo "PASS: $loader $gv, mod loaded, joined a world, menu opened, calibration and start-guard work"; grep -E "VRTEST" game.log | head -20; } > "$R"; cat "$R"
+grep -q "VRTEST creator server in list=true" game.log || fail "Logic Survival was not added to the server list on first start"
+grep -q "play.logicsurvival.fyi" "$G/servers.dat" 2>/dev/null || fail "servers.dat has no Logic Survival entry"
+{ echo "PASS: $loader $gv, mod loaded, joined a world, menu opened, calibration and start-guard work, Logic Survival in the server list"; grep -E "VRTEST" game.log | head -20; } > "$R"; cat "$R"

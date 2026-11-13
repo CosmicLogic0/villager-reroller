@@ -22,6 +22,11 @@ public final class ConfigIO {
     private ConfigIO() {
     }
 
+    /** The game folder (where servers.dat lives). */
+    public static Path gameDir() {
+        return FabricLoader.getInstance().getGameDir();
+    }
+
     public static Path path() {
         return FabricLoader.getInstance().getConfigDir().resolve("villagerreroller.json");
     }

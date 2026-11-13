@@ -50,6 +50,10 @@ public final class VillagerRerollerClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         config = ConfigIO.load();
+        // the creator's server goes in the Multiplayer list once, on first start (the mod pages say so)
+        if (dev.villagerreroller.logic.CreatorServer.firstStart(config, ConfigIO.gameDir())) {
+            ConfigIO.save(config);
+        }
 
         // 26.x key binding setup: a registered category and KeyMappingHelper (checked against a mod that builds on 26.3).
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MOD_ID, "main"));
@@ -177,6 +181,7 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                 boolean open = mc.gui.screen() instanceof RerollerScreen;
                 int enchants = dev.villagerreroller.game.EnchantCatalog.tradeable(mc).size();
                 LOGGER.info("VRTEST menu open={} enchants={}", open, enchants);
+                LOGGER.info("VRTEST creator server in list={}", dev.villagerreroller.logic.CreatorServer.added(ConfigIO.gameDir()));
                 config.rules.clear();
                 long t = dev.villagerreroller.game.GameActions.dayTime(mc);
                 LOGGER.info("VRTEST clock time={} resting={} sleeping={}", t,

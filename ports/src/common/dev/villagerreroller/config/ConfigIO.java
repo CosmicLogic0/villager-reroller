@@ -24,6 +24,12 @@ public final class ConfigIO {
     /** The game's config folder; set by the loader's entry class before anything is loaded. */
     public static Path configDir = java.nio.file.Paths.get("config");
 
+    /** The game folder (where servers.dat lives): the config folder's parent on every loader. */
+    public static Path gameDir() {
+        Path parent = configDir.toAbsolutePath().getParent();
+        return parent != null ? parent : configDir.toAbsolutePath();
+    }
+
     public static Path path() {
         return configDir.resolve("villagerreroller.json");
     }

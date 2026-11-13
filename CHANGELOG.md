@@ -1,3 +1,7 @@
+## 1.0.1
+- **Logic Survival:** the mod adds Logic Survival (`play.logicsurvival.fyi`), the survival server run by the maker of this mod, to the end of your Multiplayer server list once, the first time it starts. If you don't want it, delete it there - it won't come back by itself. The new **Server** button in the menu (V) adds it again.
+- Your other servers and their settings are kept exactly as they were (the old list is saved as `servers.dat_old`, like the game does).
+
 ## 1.0.0
 - **Every version.** Villager Reroller now runs on Fabric (Minecraft 1.15.2 and 1.16.1 - 26.3), Forge (1.15.2 - 26.3) and NeoForge (1.20.2 - 26.3). Pick the file for your loader and Minecraft version.
 - **Full release.** Each version is started in CI like a player would: the real game and loader, joining a world, opening the menu and starting calibration.
