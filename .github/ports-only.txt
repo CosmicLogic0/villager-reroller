@@ -1,3 +1,0 @@
-# rerun only these
-neoforge 1.20.3
-neoforge26 26.1.1
