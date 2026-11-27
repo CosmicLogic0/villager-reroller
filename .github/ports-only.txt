@@ -1,2 +1,0 @@
-# rerun only these
-fabric 1.14.4
