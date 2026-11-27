@@ -1,0 +1,13 @@
+BUILD OK villager-reroller-1.1.0+fabric-1.20.4.jar
+PASS: fabric 1.20.4, mod loaded, joined a world, menu opened, calibration and start-guard work, Logic Survival in the server list, panel works
+[15:29:11] [Render thread] [INFO] VRTEST loaded (Villager Reroller initialised, 0 saved rules)
+[15:29:24] [Render thread] [INFO] VRTEST in world
+[15:29:28] [Render thread] [INFO] VRTEST menu shot
+[15:29:34] [Render thread] [INFO] VRTEST menu open=true enchants=37
+[15:29:34] [Render thread] [INFO] VRTEST creator server in list=true
+[15:29:34] [Render thread] [INFO] VRTEST panel lines=8 visible=true
+[15:29:34] [Render thread] [INFO] VRTEST clock time=1106 resting=false sleeping=false
+[15:29:34] [Render thread] [INFO] VRTEST break progress/tick=0.055555556
+[15:29:35] [Render thread] [INFO] VRTEST calibration step=WAIT_PLACE
+[15:29:35] [Render thread] [INFO] VRTEST start-without-calibration refused=true
+[15:29:35] [Render thread] [INFO] VRTEST done

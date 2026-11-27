@@ -1,0 +1,13 @@
+BUILD OK villager-reroller-1.1.0+forge-1.19.3.jar
+PASS: forge 1.19.3, mod loaded, joined a world, menu opened, calibration and start-guard work, Logic Survival in the server list, panel works
+[15:28:23] [modloading-worker-0] [INFO] VRTEST loaded (Villager Reroller initialised, 0 saved rules)
+[15:28:30] [Render thread] [INFO] VRTEST in world
+[15:28:33] [Render thread] [INFO] VRTEST menu shot
+[15:28:40] [Render thread] [INFO] VRTEST menu open=true enchants=37
+[15:28:40] [Render thread] [INFO] VRTEST creator server in list=true
+[15:28:40] [Render thread] [INFO] VRTEST panel lines=8 visible=true
+[15:28:40] [Render thread] [INFO] VRTEST clock time=606 resting=false sleeping=false
+[15:28:40] [Render thread] [INFO] VRTEST break progress/tick=0.055555556
+[15:28:40] [Render thread] [INFO] VRTEST calibration step=WAIT_PLACE
+[15:28:40] [Render thread] [INFO] VRTEST start-without-calibration refused=true
+[15:28:41] [Render thread] [INFO] VRTEST done
