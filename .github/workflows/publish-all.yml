@@ -75,7 +75,7 @@ jobs:
         run: |
           mc="${{ matrix.mc }}"
           LOOM=$(curl -s https://maven.architectury.dev/dev/architectury/loom/dev.architectury.loom.gradle.plugin/maven-metadata.xml | grep -o "<latest>[^<]*</latest>" | sed 's/<[^>]*>//g')
-          FORGE=$(curl -s https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml | grep -o "<version>$mc-[^<]*</version>" | sed "s/<[^>]*>//g; s/^$mc-//" | tail -1)
+          FORGE=$(curl -s https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml | grep -o "<version>$mc-[^<]*</version>" | sed "s/<[^>]*>//g; s/^$mc-//" | sort -V | tail -1)
           case "${{ matrix.loader }}" in
             forge) echo "args=-Pforge_version=$FORGE -Parch_loom_version=$LOOM" >> "$GITHUB_OUTPUT" ;;
             forge26) echo "args=-Pforge_version=$FORGE" >> "$GITHUB_OUTPUT" ;;

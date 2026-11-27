@@ -38,6 +38,7 @@ fabric 1.16.3 1.16
 fabric 1.16.2 1.16
 fabric 1.16.1 1.16
 fabric 1.15.2 1.15
+fabric 1.14.4 1.14
 forge26 26.3
 forge26 26.2
 forge26 26.1.2
@@ -52,10 +53,13 @@ forge 1.21.6
 forge 1.21.5
 forge 1.21.4
 forge 1.21.3
+forge 1.21.2
 forge 1.21.1
 forge 1.21
 forge 1.20.6
+forge 1.20.5
 forge 1.20.4
+forge 1.20.3
 forge 1.20.2
 forge 1.20.1
 forge 1.20
@@ -69,6 +73,10 @@ forge 1.18.1
 forge 1.18
 forge 1.17.1
 forge 1.16.5
+forge 1.16.4
+forge 1.16.3
+forge 1.16.2
+forge 1.16.1
 forge 1.15.2
 neoforge26 26.3
 neoforge26 26.2
@@ -84,11 +92,14 @@ neoforge 1.21.6
 neoforge 1.21.5
 neoforge 1.21.4
 neoforge 1.21.3
+forge 1.21.2
 neoforge 1.21.2
 neoforge 1.21.1
 neoforge 1.21
 neoforge 1.20.6
+forge 1.20.5
 neoforge 1.20.5
 neoforge 1.20.4
+forge 1.20.3
 neoforge 1.20.3
 neoforge 1.20.2
