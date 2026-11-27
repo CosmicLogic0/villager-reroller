@@ -1,0 +1,4 @@
+# upload only these
+neoforge 1.21.5
+neoforge 1.21.7
+neoforge26 26.2
