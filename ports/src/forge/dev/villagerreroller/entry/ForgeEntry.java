@@ -15,7 +15,7 @@ import net.minecraftforge.fml.loading.FMLPaths;
 //#if MC < 1.21.6
 import net.minecraftforge.common.MinecraftForge;
 //#endif
-//#if MC >= 1.19.1
+//#if MC >= 1.19
 import net.minecraftforge.client.event.RegisterKeyMappingsEvent;
 //#else
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
@@ -69,9 +69,9 @@ public class ForgeEntry {
                 }
             });
             MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickBlock e) -> {
-                //#if MC >= 1.19.1
+                //#if MC >= 1.19
                 boolean cancel = VillagerRerollerClient.onUseBlock(e.getEntity(), e.getLevel(), e.getHand(), e.getHitVec());
-                //#elif MC >= 1.16
+                //#elif MC >= 1.16.4
                 boolean cancel = VillagerRerollerClient.onUseBlock(e.getPlayer(), e.getWorld(), e.getHand(), e.getHitVec());
                 //#else
                 net.minecraft.world.phys.BlockHitResult hit = new net.minecraft.world.phys.BlockHitResult(
@@ -85,14 +85,14 @@ public class ForgeEntry {
                 }
             });
             MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.EntityInteract e) -> {
-                //#if MC >= 1.19.1
+                //#if MC >= 1.19
                 VillagerRerollerClient.onUseEntity(e.getEntity(), e.getTarget());
                 //#else
                 VillagerRerollerClient.onUseEntity(e.getPlayer(), e.getTarget());
                 //#endif
             });
             MinecraftForge.EVENT_BUS.addListener((PlayerInteractEvent.LeftClickBlock e) -> {
-                //#if MC >= 1.19.1
+                //#if MC >= 1.19
                 VillagerRerollerClient.onAttackBlock(e.getEntity(), e.getPos(), e.getFace());
                 //#else
                 VillagerRerollerClient.onAttackBlock(e.getPlayer(), e.getPos(), e.getFace());
@@ -145,7 +145,7 @@ public class ForgeEntry {
                     e.register(k);
                 }
             });
-            //#elif MC >= 1.19.1
+            //#elif MC >= 1.19
             FMLJavaModLoadingContext.get().getModEventBus().addListener((RegisterKeyMappingsEvent e) -> {
                 for (KeyMapping k : VillagerRerollerClient.keys()) {
                     e.register(k);

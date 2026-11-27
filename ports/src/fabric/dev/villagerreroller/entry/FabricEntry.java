@@ -38,7 +38,7 @@ public final class FabricEntry implements ClientModInitializer {
         //#elif MC >= 1.16
         net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register((pose, delta) ->
                 dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(pose, null)));
-        //#else
+        //#elif MC >= 1.15
         net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(delta ->
                 dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(null)));
         //#endif

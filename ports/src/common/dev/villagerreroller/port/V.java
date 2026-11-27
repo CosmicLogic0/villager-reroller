@@ -129,6 +129,31 @@ public final class V {
         //#endif
     }
 
+    public static double x(Entity e) {
+        //#if MC >= 1.15
+        return e.getX();
+        //#else
+        return e.x;
+        //#endif
+    }
+
+    public static double z(Entity e) {
+        //#if MC >= 1.15
+        return e.getZ();
+        //#else
+        return e.z;
+        //#endif
+    }
+
+    /** Holds or releases a key binding (the movement keys while walking). */
+    public static void setDown(net.minecraft.client.KeyMapping k, boolean down) {
+        //#if MC >= 1.15
+        k.setDown(down);
+        //#else
+        net.minecraft.client.KeyMapping.set(com.mojang.blaze3d.platform.InputConstants.getKey(k.saveString()), down);
+        //#endif
+    }
+
     /** The block the entity stands in. */
     public static net.minecraft.core.BlockPos feet(Entity e) {
         //#if MC >= 1.16

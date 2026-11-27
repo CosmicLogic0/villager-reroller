@@ -63,7 +63,11 @@ jobs:
         id: v
         run: |
           mc="${{ matrix.mc }}"
-          LOOM=$(curl -s https://maven.architectury.dev/dev/architectury/loom/dev.architectury.loom.gradle.plugin/maven-metadata.xml | grep -o "<latest>[^<]*</latest>" | sed 's/<[^>]*>//g')
+          # newest Architectury Loom that is really published (the list sometimes names one before its files are up)
+          LOOM=""
+          for L in $(curl -s https://maven.architectury.dev/dev/architectury/loom/dev.architectury.loom.gradle.plugin/maven-metadata.xml | grep -oE "<version>1\.[0-9]+\.[0-9]+</version>" | sed 's/<[^>]*>//g' | sort -V | tail -5 | tac); do
+            if curl -sfI "https://maven.architectury.dev/dev/architectury/architectury-loom/$L/architectury-loom-$L.pom" > /dev/null; then LOOM="$L"; break; fi
+          done
           FORGE=$(curl -s https://maven.minecraftforge.net/net/minecraftforge/forge/maven-metadata.xml | grep -o "<version>$mc-[^<]*</version>" | sed "s/<[^>]*>//g; s/^$mc-//" | sort -V | tail -1)
           case "${{ matrix.loader }}" in
             forge) echo "args=-Pforge_version=$FORGE -Parch_loom_version=$LOOM" >> "$GITHUB_OUTPUT"; echo "lv=$mc-$FORGE" >> "$GITHUB_OUTPUT"; echo "Forge $FORGE, Loom $LOOM" ;;

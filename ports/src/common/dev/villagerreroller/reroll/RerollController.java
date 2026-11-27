@@ -592,7 +592,7 @@ public final class RerollController {
         Vec3 bed = cal.bedHit.getLocation();
         Vec3 bedCenter = new Vec3(cal.bedPos.getX() + 0.5, cal.bedPos.getY() + 0.5, cal.bedPos.getZ() + 0.5);
         // vanilla only lets you sleep when the bed is close (about 3 blocks), not just within arm's reach
-        boolean closeEnough = Math.hypot(bedCenter.x - p.getX(), bedCenter.z - p.getZ()) <= 2.0;
+        boolean closeEnough = Math.hypot(bedCenter.x - V.x(p), bedCenter.z - V.z(p)) <= 2.0;
         if (closeEnough && GameActions.inBlockReach(p, bed)) {
             GameActions.releaseMovement(mc);
             if (!DayCycle.canSleep(GameActions.dayTime(mc), GameActions.thundering(mc))) {
@@ -664,7 +664,7 @@ public final class RerollController {
             resume(mc);
             return;
         }
-        double d = Math.hypot(returnPos.x - p.getX(), returnPos.z - p.getZ());
+        double d = Math.hypot(returnPos.x - V.x(p), returnPos.z - V.z(p));
         if (d <= ARRIVE_DISTANCE) {
             GameActions.releaseMovement(mc);
             if (cfg.handleNight && DayCycle.villagersResting(GameActions.dayTime(mc))) {
@@ -697,7 +697,7 @@ public final class RerollController {
     /** Holds the right movement keys for one tick. Returns false when stuck or out of time. */
     private boolean walkStep(Minecraft mc, LocalPlayer p, Vec3 target) {
         stateTicks++;
-        double d = Math.hypot(target.x - p.getX(), target.z - p.getZ());
+        double d = Math.hypot(target.x - V.x(p), target.z - V.z(p));
         if (d < walkBestDist - 0.05) {
             walkBestDist = d;
             walkStuckTicks = 0;

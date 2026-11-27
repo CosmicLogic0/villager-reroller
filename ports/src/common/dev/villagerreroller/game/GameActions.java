@@ -138,20 +138,20 @@ public final class GameActions {
 
     /** Holds the movement keys that move the player towards {@code target}, keeping the current facing. */
     public static void walkTowards(Minecraft mc, LocalPlayer p, Vec3 target) {
-        WalkMath.Keys k = WalkMath.keysTowards(p.getX(), p.getZ(), target.x, target.z, V.yaw(p), 0.12, 0.9);
-        mc.options.keyUp.setDown(k.forward());
-        mc.options.keyDown.setDown(k.back());
-        mc.options.keyLeft.setDown(k.left());
-        mc.options.keyRight.setDown(k.right());
+        WalkMath.Keys k = WalkMath.keysTowards(V.x(p), V.z(p), target.x, target.z, V.yaw(p), 0.12, 0.9);
+        V.setDown(mc.options.keyUp, k.forward());
+        V.setDown(mc.options.keyDown, k.back());
+        V.setDown(mc.options.keyLeft, k.left());
+        V.setDown(mc.options.keyRight, k.right());
     }
 
     public static void releaseMovement(Minecraft mc) {
         if (mc.options == null) {
             return;
         }
-        mc.options.keyUp.setDown(false);
-        mc.options.keyDown.setDown(false);
-        mc.options.keyLeft.setDown(false);
-        mc.options.keyRight.setDown(false);
+        V.setDown(mc.options.keyUp, false);
+        V.setDown(mc.options.keyDown, false);
+        V.setDown(mc.options.keyLeft, false);
+        V.setDown(mc.options.keyRight, false);
     }
 }
