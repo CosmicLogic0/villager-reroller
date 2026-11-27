@@ -143,6 +143,18 @@ public final class VillagerRerollerClient {
                             CALIBRATION.begin(Minecraft.getInstance());
                             return 1;
                         }))
+                .then(LiteralArgumentBuilder.<S>literal("addvillager")
+                        .executes(ctx -> {
+                            CALIBRATION.beginAnother(Minecraft.getInstance());
+                            return 1;
+                        }))
+                .then(LiteralArgumentBuilder.<S>literal("hud")
+                        .executes(ctx -> {
+                            config.showHud = !config.showHud;
+                            ConfigIO.save(config);
+                            Msg.info(Minecraft.getInstance(), "On-screen panel " + (config.showHud ? "on." : "off."));
+                            return 1;
+                        }))
                 .then(LiteralArgumentBuilder.<S>literal("setbed")
                         .executes(ctx -> {
                             CALIBRATION.askForBed(Minecraft.getInstance());
@@ -173,7 +185,7 @@ public final class VillagerRerollerClient {
                 .then(LiteralArgumentBuilder.<S>literal("status")
                         .executes(ctx -> {
                             Minecraft mc = Minecraft.getInstance();
-                            Msg.info(mc, "Calibrated: " + CALIBRATION.isDone()
+                            Msg.info(mc, "Calibrated: " + CALIBRATION.isDone() + " (" + CALIBRATION.stationCount() + " villager" + (CALIBRATION.stationCount() == 1 ? "" : "s") + ")"
                                     + " | bed: " + (CALIBRATION.hasBed() ? "set" : "not set")
                                     + " | running: " + CONTROLLER.isRunning()
                                     + " | rerolls: " + CONTROLLER.rerolls()
@@ -205,6 +217,12 @@ public final class VillagerRerollerClient {
                 int enchants = dev.villagerreroller.game.EnchantCatalog.tradeable(mc).size();
                 LOGGER.info("VRTEST menu open={} enchants={}", open, enchants);
                 LOGGER.info("VRTEST creator server in list={}", dev.villagerreroller.logic.CreatorServer.added(ConfigIO.gameDir()));
+                CONTROLLER.stats.start(2);
+                CONTROLLER.stats.reroll("Mending - 30 (150%)");
+                CONTROLLER.stats.reroll(null);
+                CONTROLLER.stats.found("Unbreaking III - 12 (100%)");
+                LOGGER.info("VRTEST panel lines={} visible={}", CONTROLLER.stats.lines(System.currentTimeMillis()).size(),
+                        CONTROLLER.stats.visible(System.currentTimeMillis()));
                 config.rules.clear();
                 long t = dev.villagerreroller.game.GameActions.dayTime(mc);
                 LOGGER.info("VRTEST clock time={} resting={} sleeping={}", t,
@@ -223,6 +241,7 @@ public final class VillagerRerollerClient {
                 LOGGER.info("VRTEST start-without-calibration refused={}", !started);
                 config.rules.remove("minecraft:mending");
             } else if (selftestTicks == 220) {
+                CONTROLLER.stats.clear();
                 LOGGER.info("VRTEST done");
                 selftestTicks = 1000;
             }

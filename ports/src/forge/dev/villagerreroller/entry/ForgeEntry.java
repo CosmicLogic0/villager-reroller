@@ -42,6 +42,7 @@ public class ForgeEntry {
             ConfigIO.configDir = FMLPaths.CONFIGDIR.get();
             VillagerRerollerClient.init();
             registerKeys();
+            registerHud();
 
             //#if MC >= 1.21.6
             TickEvent.ClientTickEvent.Post.BUS.addListener(e -> VillagerRerollerClient.tick(Minecraft.getInstance()));
@@ -97,6 +98,44 @@ public class ForgeEntry {
             MinecraftForge.EVENT_BUS.addListener((RegisterClientCommandsEvent e) ->
                     e.getDispatcher().register(VillagerRerollerClient.<CommandSourceStack>command()));
             //#endif
+            //#endif
+        }
+
+        /** The on-screen panel while rerolling, drawn from whichever HUD event this Forge has. */
+        private static void registerHud() {
+            //#if MC >= 1.21.6
+            net.minecraftforge.client.event.CustomizeGuiOverlayEvent.Chat.BUS.addListener(e ->
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(e.getGuiGraphics())));
+            //#elif MC >= 1.20.5
+            MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.client.event.CustomizeGuiOverlayEvent.Chat e) ->
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(e.getGuiGraphics())));
+            //#elif MC >= 1.20
+            MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.client.event.RenderGuiEvent.Post e) ->
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(e.getGuiGraphics())));
+            //#elif MC >= 1.19.1
+            MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.client.event.RenderGuiOverlayEvent.Post e) -> {
+                if ("chat_panel".equals(e.getOverlay().id().getPath())) {   // once per frame
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(e.getPoseStack(), null));
+                }
+            });
+            //#elif MC >= 1.19
+            MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.client.event.RenderGameOverlayEvent.Post e) -> {
+                if (e.getType() == net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType.ALL) {
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(e.getPoseStack(), null));
+                }
+            });
+            //#elif MC >= 1.16
+            MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.client.event.RenderGameOverlayEvent.Post e) -> {
+                if (e.getType() == net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType.ALL) {
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(e.getMatrixStack(), null));
+                }
+            });
+            //#else
+            MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.client.event.RenderGameOverlayEvent.Post e) -> {
+                if (e.getType() == net.minecraftforge.client.event.RenderGameOverlayEvent.ElementType.ALL) {
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(null));
+                }
+            });
             //#endif
         }
 

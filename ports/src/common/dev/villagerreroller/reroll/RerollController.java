@@ -3,12 +3,13 @@ package dev.villagerreroller.reroll;
 import dev.villagerreroller.game.GameActions;
 import dev.villagerreroller.game.Msg;
 import dev.villagerreroller.game.Sounds;
-import dev.villagerreroller.port.V;
 import dev.villagerreroller.game.VillagerReader;
 import dev.villagerreroller.logic.BookOffer;
 import dev.villagerreroller.logic.DayCycle;
 import dev.villagerreroller.logic.OfferMatcher;
+import dev.villagerreroller.logic.RerollStats;
 import dev.villagerreroller.logic.RerollerConfig;
+import dev.villagerreroller.port.V;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.inventory.MerchantScreen;
 import net.minecraft.client.player.LocalPlayer;
@@ -29,6 +30,9 @@ import java.util.Optional;
  *
  * At night (villagers sleep instead of taking jobs) it pauses, sleeps in the calibrated bed if there is one,
  * walks back to where you were standing, and carries on.
+ *
+ * With several calibrated villagers it works through them in order: when one offers a wanted book, its lectern is
+ * left in place (so the villager keeps that trade) and the next villager is rerolled.
  *
  * The camera is never moved: blocks and the villager are used straight from the positions recorded during
  * calibration, and walking is done with the movement keys relative to wherever you happen to be facing.
@@ -51,7 +55,6 @@ public final class RerollController {
     private static final int INTERACT_RETRY_TICKS = 20;
     private static final int MAX_CLAIM_FAILS = 5;
     private static final int SAME_OFFER_LIMIT = 6;
-    private static final int NO_BOOK_LIMIT = 5;
     private static final int WALK_TIMEOUT_TICKS = 20 * 15;
     private static final int WALK_STUCK_TICKS = 20 * 3;
     private static final int SLEEP_CONFIRM_TICKS = 40;
@@ -85,7 +88,9 @@ public final class RerollController {
     private int claimFails;
     private int rerolls;
     private int sameOfferStreak;
-    private int noBookStreak;
+    private int station;
+    /** What the on-screen panel shows. */
+    public final RerollStats stats = new RerollStats();
     private String lastSignature = "";
     private String lastSummary = "";
     private long startedAtMs;
@@ -115,6 +120,11 @@ public final class RerollController {
         return lastSummary;
     }
 
+    /** Which calibrated villager is being rerolled (0-based). */
+    public int station() {
+        return station;
+    }
+
     public boolean isNightPaused() {
         return running && state.ordinal() >= State.NIGHT_WAIT.ordinal();
     }
@@ -139,6 +149,7 @@ public final class RerollController {
             Msg.warn(mc, "Nothing selected. Mark at least one enchant as WANT in the menu, or turn on \"accept any\".");
             return false;
         }
+        cal.select(0);
         Entity villager = villager(mc);
         if (villager == null) {
             Msg.warn(mc, "I can't find the calibrated villager (too far away or unloaded). Recalibrate.");
@@ -146,15 +157,14 @@ public final class RerollController {
         }
         cal.skipBed(mc); // starting means "no bed" if the bed step was still open
 
-        boolean lecternPlaced = mc.level.getBlockState(cal.lecternPos).getBlock() == Blocks.LECTERN;
-        if (lecternPlaced) {
-            state = State.BREAK_PREP;
-        } else if (GameActions.countHotbar(p, Items.LECTERN) > 0) {
-            state = State.PLACE_PREP;
-        } else {
+        State first = firstState(mc, p);
+        if (first == null) {
             Msg.warn(mc, "No lectern in the world at the calibrated spot and none in your hotbar.");
             return false;
         }
+        state = first;
+        station = 0;
+        stats.start(cal.stationCount());
 
         running = true;
         cooldown = 0;
@@ -164,15 +174,23 @@ public final class RerollController {
         claimFails = 0;
         rerolls = 0;
         sameOfferStreak = 0;
-        noBookStreak = 0;
         lastSignature = "";
         lastSummary = "";
         returnPos = null;
         movedForNight = false;
         startedAtMs = System.currentTimeMillis();
-        Msg.ok(mc, "Rerolling started. Press the toggle key (B) or use /vr stop to stop.");
+        Msg.ok(mc, "Rerolling started" + (cal.stationCount() > 1 ? " (" + cal.stationCount() + " villagers, in order)" : "")
+                + ". Press the toggle key (B) or use /vr stop to stop.");
         Sounds.started(mc);
         return true;
+    }
+
+    /** Where to begin at the current station: break its lectern if it's there, else place one. null = can't. */
+    private State firstState(Minecraft mc, LocalPlayer p) {
+        if (mc.level.getBlockState(cal.lecternPos).getBlock() == Blocks.LECTERN) {
+            return State.BREAK_PREP;
+        }
+        return GameActions.countHotbar(p, Items.LECTERN) > 0 ? State.PLACE_PREP : null;
     }
 
     public void stop(Minecraft mc, String reason, boolean success) {
@@ -180,6 +198,7 @@ public final class RerollController {
             return;
         }
         running = false;
+        stats.stop(reason, success);
         cleanup(mc);
         long secs = Math.max(1, (System.currentTimeMillis() - startedAtMs) / 1000);
         String stats = " (" + rerolls + " rerolls in " + secs + "s)";
@@ -195,6 +214,7 @@ public final class RerollController {
     /** Used on disconnect, when there's no player left to message. */
     public void stopSilently() {
         running = false;
+        stats.clear();
         GameActions.releaseMovement(Minecraft.getInstance());
     }
 
@@ -445,32 +465,35 @@ public final class RerollController {
         List<BookOffer> books = scan.books();
 
         if (books.isEmpty()) {
-            noBookStreak++;
+            // Librarians often roll paper / bookshelves / glass with no book at all: that's just another miss.
             lastSummary = "no enchanted book offered";
             Msg.bar(mc, "Reroll #" + rerolls + ": no enchanted book");
-            if (noBookStreak >= NO_BOOK_LIMIT) {
-                stop(mc, "this villager keeps offering no enchanted book. Is it a librarian?", false);
-                return;
-            }
-        } else {
-            noBookStreak = 0;
         }
 
         Optional<OfferMatcher.MatchResult> hit = OfferMatcher.firstAccepted(books, cfg);
         if (hit.isPresent()) {
             OfferMatcher.MatchResult m = hit.get();
             lastSummary = describe(m);
+            stats.found(shortDescribe(m));
+            if (station + 1 < cal.stationCount()) {
+                nextStation(mc, m, cfg);
+                return;
+            }
             // The trade screen is deliberately left open so you can buy the book right away.
+            String all = cal.stationCount() > 1 ? " All " + cal.stationCount() + " villagers done: " + String.join(", ", stats.foundList()) + "." : "";
             stop(mc, "Found " + m.offer().displayName() + " for " + m.offer().price()
                     + " emeralds (" + m.percent() + "% of best, best = " + m.best() + "). "
-                    + "The lectern is left in place.", true);
+                    + "The lectern is left in place." + all, true);
             return;
         }
 
         if (!books.isEmpty()) {
             OfferMatcher.MatchResult first = OfferMatcher.evaluate(books.get(0), cfg);
             lastSummary = describe(first);
+            stats.reroll(shortDescribe(first));
             Msg.bar(mc, "Reroll #" + rerolls + ": " + describe(first));
+        } else {
+            stats.reroll(null);
         }
 
         if (scan.signature().equals(lastSignature)) {
@@ -487,6 +510,33 @@ public final class RerollController {
 
         GameActions.closeScreenAndContainer(mc);
         go(State.BREAK_PREP, cfg.actionDelayTicks);
+    }
+
+    /** A wanted book at this villager: keep its lectern (so it keeps the trade) and move on to the next villager. */
+    private void nextStation(Minecraft mc, OfferMatcher.MatchResult m, RerollerConfig cfg) {
+        int n = cal.stationCount();
+        Msg.ok(mc, "Villager " + (station + 1) + " of " + n + ": found " + m.offer().displayName() + " for " + m.offer().price()
+                + " emeralds. Its lectern stays, so it keeps that trade. On to villager " + (station + 2) + ".");
+        Sounds.found(mc);
+        GameActions.closeScreenAndContainer(mc);
+        station++;
+        cal.select(station);
+        stats.station(station);
+        breakRetries = 0;
+        placeRetries = 0;
+        claimFails = 0;
+        sameOfferStreak = 0;
+        lastSignature = "";
+        State first = firstState(mc, mc.player);
+        if (first == null) {
+            stop(mc, "out of lecterns for villager " + (station + 1) + ". Keep a spare lectern per villager in your hotbar.", false);
+            return;
+        }
+        go(first, cfg.actionDelayTicks + 10);
+    }
+
+    private static String shortDescribe(OfferMatcher.MatchResult m) {
+        return m.offer().displayName() + " - " + m.offer().price() + " (" + m.percent() + "%)";
     }
 
     private static String describe(OfferMatcher.MatchResult m) {

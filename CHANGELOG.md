@@ -1,3 +1,8 @@
+## 1.1.0
+- **Keeps going when there's no book.** Librarians often offer only paper, bookshelves or glass. That used to stop the mod after a few tries; now it's just another reroll and it carries on until it finds your book.
+- **On-screen panel while rerolling** (top-left): rerolls so far, time spent, which villager it's on, the books it found, and the last few books it saw with their prices. It stays up for a few seconds after stopping. `/vr hud` turns it off or on.
+- **Several villagers in a row.** After calibrating, press **+ Villager** in the menu (or `/vr addvillager`) to add more librarians that are in reach from your spot. Rerolling works through them in order: when one offers a wanted book, its lectern is left in place so it keeps that trade, and the mod moves on to the next. Keep a spare lectern per villager in your hotbar.
+
 ## 1.0.1
 - **Logic Survival:** the mod adds Logic Survival (`play.logicsurvival.fyi`), the survival server run by the maker of this mod, to the end of your Multiplayer server list once, the first time it starts. If you don't want it, delete it there - it won't come back by itself. The new **Server** button in the menu (V) adds it again.
 - Your other servers and their settings are kept exactly as they were (the old list is saved as `servers.dat_old`, like the game does).

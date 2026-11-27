@@ -47,6 +47,9 @@ public final class RerollerConfig {
     /** At night villagers go to bed instead of taking jobs: pause, sleep in the calibrated bed, then carry on. */
     public boolean handleNight = true;
 
+    /** Show the on-screen panel (rerolls, time, last books, found books) while rerolling. */
+    public boolean showHud = true;
+
     /** The Logic Survival server was put in the Multiplayer list once (on first start) - never again after that. */
     public boolean serverOffered = false;
 

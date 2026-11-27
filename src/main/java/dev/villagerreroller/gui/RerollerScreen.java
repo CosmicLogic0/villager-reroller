@@ -218,7 +218,7 @@ public final class RerollerScreen extends Screen {
         g.text(this.font, "Villager Reroller", px + 30, py + 6, GOLD, true);
         int sc = statusColor();
         g.fill(px + 30, py + 20, px + 34, py + 24, sc);
-        g.text(this.font, fit(statusText(), pw - 140), px + 38, py + 18, MUTED, false);
+        g.text(this.font, fit(statusText(), pw - 220), px + 38, py + 18, MUTED, false);
 
         // close
         int cx = px + pw - 26;
@@ -244,6 +244,16 @@ public final class RerollerScreen extends Screen {
                     }
                 },
                 tip(running ? "Stop rerolling" : "Start rerolling", "Shortcut: the toggle key (B) or /vr start"));
+
+        var cal = VillagerRerollerClient.CALIBRATION;
+        button(g, mx, my, cx - 70 - 80, cy, 74, 18, "+ Villager", Style.NORMAL, cal.isDone() && !running, b -> {
+            saveAndClose();
+            cal.beginAnother(mc);
+        }, cal.isDone()
+                ? tip("Add another villager", "Calibrate one more librarian that is in reach from", "where you stand. Rerolling works through them in",
+                        "order; each keeps its book (lectern left in place)", "until you buy it. Now: " + cal.stationCount() + " villager"
+                        + (cal.stationCount() == 1 ? "" : "s") + ". Calibrate starts over.")
+                : tip("Add another villager", "Calibrate the first villager first."));
     }
 
     private void drawToolbar(GuiGraphicsExtractor g, int mx, int my, RerollerConfig cfg) {
@@ -725,10 +735,12 @@ public final class RerollerScreen extends Screen {
         var cal = VillagerRerollerClient.CALIBRATION;
         String bed = cal.hasBed() ? "  ·  bed set" : "  ·  no bed";
         if (controller.isRunning()) {
-            return (controller.isNightPaused() ? "Night pause" : "Running") + "  ·  reroll #" + controller.rerolls() + bed;
+            String which = cal.stationCount() > 1 ? "  ·  villager " + (controller.station() + 1) + "/" + cal.stationCount() : "";
+            return (controller.isNightPaused() ? "Night pause" : "Running") + "  ·  reroll #" + controller.rerolls() + which + bed;
         }
         if (cal.isDone()) {
-            return "Calibrated and ready" + bed;
+            int n = cal.stationCount();
+            return (n > 1 ? n + " villagers calibrated" : "Calibrated and ready") + bed;
         }
         if (cal.isActive()) {
             return "Calibrating... follow the chat instructions";

@@ -62,6 +62,8 @@ public class NeoEntry {
                 }
             });
             //#endif
+            NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.client.event.RenderGuiEvent.Post e) ->
+                    dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(e.getGuiGraphics())));
             NeoForge.EVENT_BUS.addListener((PlayerInteractEvent.RightClickBlock e) -> {
                 if (VillagerRerollerClient.onUseBlock(e.getEntity(), e.getLevel(), e.getHand(), e.getHitVec())) {
                     e.setCanceled(true);

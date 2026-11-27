@@ -18,12 +18,16 @@ jobs:
       matrix: ${{ steps.m.outputs.matrix }}
       version: ${{ steps.m.outputs.version }}
       mr: ${{ steps.m.outputs.mr }}
+      cf: ${{ steps.m.outputs.cf }}
     steps:
       - uses: actions/checkout@v4
       - id: m
         run: |
           echo "version=$(grep '^mod_version=' gradle.properties | cut -d= -f2)" >> "$GITHUB_OUTPUT"
           echo "mr=$(grep -v '^#' .github/modrinth-id.txt 2>/dev/null | tr -d ' \r\n')" >> "$GITHUB_OUTPUT"
+          # .github/skip-curseforge / .github/skip-modrinth: retry only the other site (e.g. after Modrinth's daily limit)
+          if [ -f .github/skip-modrinth ]; then echo "mr=" >> "$GITHUB_OUTPUT"; fi
+          if [ -f .github/skip-curseforge ]; then echo "cf=no" >> "$GITHUB_OUTPUT"; else echo "cf=yes" >> "$GITHUB_OUTPUT"; fi
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
           import json, os
           def rows(p):
@@ -118,7 +122,7 @@ jobs:
           dependencies: ${{ matrix.base == 'fabric' && 'fabric-api(required)' || '' }}
           changelog-file: CHANGELOG.md
       - name: Upload to CurseForge
-        if: always() && matrix.upload
+        if: always() && matrix.upload && needs.plan.outputs.cf == 'yes'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           curseforge-id: 1782710

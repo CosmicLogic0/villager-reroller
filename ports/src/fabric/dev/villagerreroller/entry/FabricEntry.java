@@ -31,6 +31,18 @@ public final class FabricEntry implements ClientModInitializer {
         }
         ClientTickEvents.END_CLIENT_TICK.register(VillagerRerollerClient::tick);
 
+        // the on-screen panel while rerolling
+        //#if MC >= 1.20
+        net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register((g, delta) ->
+                dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(g)));
+        //#elif MC >= 1.16
+        net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register((pose, delta) ->
+                dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(pose, null)));
+        //#else
+        net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback.EVENT.register(delta ->
+                dev.villagerreroller.gui.RerollHud.draw(new dev.villagerreroller.port.G(null)));
+        //#endif
+
         // These fire for both the client and (in singleplayer) the integrated server; the mod ignores everything
         // that isn't the local player.
         UseBlockCallback.EVENT.register((player, level, hand, hit) ->

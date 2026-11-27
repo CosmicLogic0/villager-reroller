@@ -16,11 +16,17 @@ import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.BlockHitResult;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
  * Walks the player through doing the routine once by hand so the mod can copy it:
  *   1. place the lectern  2. right-click the villager  3. break the lectern  4. (optional) right-click a bed
+ *
+ * More villagers can be added afterwards ("+ Villager" in the menu, /vr addvillager): each one is a "station"
+ * (its lectern spot and villager). Rerolling works through them in order. The public fields below always hold the
+ * station being worked on; {@link #select} switches them.
  *
  * Everything recorded here lives in memory only (positions are specific to one world) and is
  * forgotten when you leave the world.
@@ -48,6 +54,31 @@ public final class Calibration {
     public Direction breakFace = Direction.UP;
     public int breakSlot = 0;
 
+    /** One calibrated villager and its lectern. */
+    public static final class Station {
+        final BlockPos lecternPos;
+        final BlockHitResult placeHit;
+        final int lecternSlot;
+        final int villagerId;
+        final UUID villagerUuid;
+        final Direction breakFace;
+        final int breakSlot;
+
+        Station(BlockPos lecternPos, BlockHitResult placeHit, int lecternSlot, int villagerId, UUID villagerUuid,
+                Direction breakFace, int breakSlot) {
+            this.lecternPos = lecternPos;
+            this.placeHit = placeHit;
+            this.lecternSlot = lecternSlot;
+            this.villagerId = villagerId;
+            this.villagerUuid = villagerUuid;
+            this.breakFace = breakFace;
+            this.breakSlot = breakSlot;
+        }
+    }
+
+    private final List<Station> stations = new ArrayList<>();
+    private boolean adding;
+
     // ---- optional bed, used at night ----
     public BlockPos bedPos;
     public BlockHitResult bedHit;
@@ -66,6 +97,15 @@ public final class Calibration {
     }
 
     public void reset() {
+        stations.clear();
+        adding = false;
+        clearCurrent();
+        bedPos = null;
+        bedHit = null;
+        awaitingBed = false;
+    }
+
+    private void clearCurrent() {
         step = Step.IDLE;
         timer = 0;
         candidateA = null;
@@ -77,9 +117,36 @@ public final class Calibration {
         villagerUuid = null;
         breakFace = Direction.UP;
         breakSlot = 0;
-        bedPos = null;
-        bedHit = null;
-        awaitingBed = false;
+    }
+
+    /** How many villagers are calibrated. */
+    public int stationCount() {
+        return stations.size();
+    }
+
+    /** Makes station i the one the public fields describe (the one being rerolled). */
+    public void select(int i) {
+        Station st = stations.get(i);
+        lecternPos = st.lecternPos;
+        placeHit = st.placeHit;
+        lecternSlot = st.lecternSlot;
+        villagerId = st.villagerId;
+        villagerUuid = st.villagerUuid;
+        breakFace = st.breakFace;
+        breakSlot = st.breakSlot;
+    }
+
+    /** Calibrate one more villager, keeping the ones already done. */
+    public void beginAnother(Minecraft mc) {
+        if (!isDone() || stations.isEmpty()) {
+            begin(mc);
+            return;
+        }
+        clearCurrent();
+        adding = true;
+        step = Step.WAIT_PLACE;
+        Msg.ok(mc, "Adding villager #" + (stations.size() + 1) + ". Do the same routine for it (stay where you are: every villager must be in reach from your spot).");
+        Msg.step(mc, "Step 1/3: place a lectern next to the new villager (one that has never been traded with).");
     }
 
     public boolean hasBed() {
@@ -131,10 +198,24 @@ public final class Calibration {
         breakFace = face;
         breakSlot = toolSlot;
         step = Step.DONE;
+        stations.add(new Station(lecternPos, placeHit, lecternSlot, villagerId, villagerUuid, breakFace, breakSlot));
     }
 
     public void cancel(Minecraft mc) {
+        if (adding && !stations.isEmpty()) {
+            adding = false;
+            clearCurrent();
+            select(0);
+            step = Step.DONE;
+            Msg.info(mc, "Adding a villager cancelled. Your " + stations.size() + " calibrated villager"
+                    + (stations.size() == 1 ? " is" : "s are") + " kept.");
+            return;
+        }
+        BlockPos keepBedPos = bedPos;
+        BlockHitResult keepBedHit = bedHit;
         reset();
+        bedPos = keepBedPos;
+        bedHit = keepBedHit;
         Msg.info(mc, "Calibration cancelled.");
     }
 
@@ -160,7 +241,7 @@ public final class Calibration {
         if (step != Step.WAIT_PLACE) {
             return false;
         }
-        if (!player.getItemInHand(hand).is(Items.LECTERN)) {
+        if (player.getItemInHand(hand).getItem() != Items.LECTERN) {
             return false;
         }
         placeHit = hit;
@@ -182,11 +263,17 @@ public final class Calibration {
             Msg.warn(mc, "That's not a villager. Right-click the villager that should get the new job.");
             return;
         }
+        for (Station st : stations) {
+            if (st.villagerUuid.equals(entity.getUUID())) {
+                Msg.warn(mc, "That villager is already calibrated. Right-click the new one.");
+                return;
+            }
+        }
         villagerId = entity.getId();
         villagerUuid = entity.getUUID();
         step = Step.WAIT_BREAK;
         Msg.ok(mc, "Villager recorded.");
-        Msg.step(mc, "Step 3/4: break the lectern with whatever tool you want me to use. Then make sure the lectern item ends up in your hotbar.");
+        Msg.step(mc, (adding ? "Step 3/3" : "Step 3/4") + ": break the lectern with whatever tool you want me to use. Then make sure the lectern item ends up in your hotbar.");
     }
 
     /** Called from Fabric's AttackBlockCallback. */
@@ -208,24 +295,33 @@ public final class Calibration {
         }
         switch (step) {
             case WAIT_PLACE_CONFIRM -> {
-                if (mc.level.getBlockState(candidateA).is(Blocks.LECTERN)) {
+                if (mc.level.getBlockState(candidateA).getBlock() == Blocks.LECTERN) {
                     lecternPos = candidateA;
-                } else if (mc.level.getBlockState(candidateB).is(Blocks.LECTERN)) {
+                } else if (mc.level.getBlockState(candidateB).getBlock() == Blocks.LECTERN) {
                     lecternPos = candidateB;
                 }
                 if (lecternPos != null) {
                     step = Step.WAIT_VILLAGER;
                     Msg.ok(mc, "Lectern recorded.");
-                    Msg.step(mc, "Step 2/4: right-click the villager so I know which one to talk to.");
+                    Msg.step(mc, (adding ? "Step 2/3" : "Step 2/4") + ": right-click the villager so I know which one to talk to.");
                 } else if (++timer > CONFIRM_TIMEOUT_TICKS) {
                     step = Step.WAIT_PLACE;
                     Msg.warn(mc, "The lectern didn't appear. Try placing it again.");
                 }
             }
             case WAIT_BREAK_CONFIRM -> {
-                if (!mc.level.getBlockState(lecternPos).is(Blocks.LECTERN)) {
+                if (mc.level.getBlockState(lecternPos).getBlock() != Blocks.LECTERN) {
                     step = Step.DONE;
+                    stations.add(new Station(lecternPos, placeHit, lecternSlot, villagerId, villagerUuid, breakFace, breakSlot));
+                    if (adding) {
+                        adding = false;
+                        select(0);
+                        Msg.ok(mc, "Villager #" + stations.size() + " added! Rerolling works through all " + stations.size()
+                                + " in order. Keep a spare lectern per villager in your hotbar. Press B or /vr start.");
+                        return;
+                    }
                     Msg.ok(mc, "Calibration complete! Pick the lectern back up (spare lecterns in your hotbar are fine too).");
+                    Msg.info(mc, "Got more librarians in reach? \"+ Villager\" in the menu (or /vr addvillager) adds another one.");
                     awaitingBed = !hasBed();
                     if (hasBed()) {
                         Msg.info(mc, "Using the bed you set before (/vr setbed to change it). Press B or /vr start.");

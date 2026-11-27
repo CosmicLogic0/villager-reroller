@@ -50,6 +50,7 @@ public final class VillagerRerollerClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         config = ConfigIO.load();
+        dev.villagerreroller.gui.RerollHud.init();
         // the creator's server goes in the Multiplayer list once, on first start (the mod pages say so)
         if (dev.villagerreroller.logic.CreatorServer.firstStart(config, ConfigIO.gameDir())) {
             ConfigIO.save(config);
@@ -116,6 +117,18 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                                     CALIBRATION.begin(Minecraft.getInstance());
                                     return 1;
                                 }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("addvillager")
+                                .executes(ctx -> {
+                                    CALIBRATION.beginAnother(Minecraft.getInstance());
+                                    return 1;
+                                }))
+                        .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("hud")
+                                .executes(ctx -> {
+                                    config.showHud = !config.showHud;
+                                    ConfigIO.save(config);
+                                    Msg.info(Minecraft.getInstance(), "On-screen panel " + (config.showHud ? "on." : "off."));
+                                    return 1;
+                                }))
                         .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("setbed")
                                 .executes(ctx -> {
                                     CALIBRATION.askForBed(Minecraft.getInstance());
@@ -146,7 +159,7 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                         .then(LiteralArgumentBuilder.<FabricClientCommandSource>literal("status")
                                 .executes(ctx -> {
                                     Minecraft mc = Minecraft.getInstance();
-                                    Msg.info(mc, "Calibrated: " + CALIBRATION.isDone()
+                                    Msg.info(mc, "Calibrated: " + CALIBRATION.isDone() + " (" + CALIBRATION.stationCount() + " villager" + (CALIBRATION.stationCount() == 1 ? "" : "s") + ")"
                                             + " | bed: " + (CALIBRATION.hasBed() ? "set" : "not set")
                                             + " | running: " + CONTROLLER.isRunning()
                                             + " | rerolls: " + CONTROLLER.rerolls()
@@ -182,6 +195,12 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                 int enchants = dev.villagerreroller.game.EnchantCatalog.tradeable(mc).size();
                 LOGGER.info("VRTEST menu open={} enchants={}", open, enchants);
                 LOGGER.info("VRTEST creator server in list={}", dev.villagerreroller.logic.CreatorServer.added(ConfigIO.gameDir()));
+                CONTROLLER.stats.start(2);
+                CONTROLLER.stats.reroll("Mending - 30 (150%)");
+                CONTROLLER.stats.reroll(null);
+                CONTROLLER.stats.found("Unbreaking III - 12 (100%)");
+                LOGGER.info("VRTEST panel lines={} visible={}", CONTROLLER.stats.lines(System.currentTimeMillis()).size(),
+                        CONTROLLER.stats.visible(System.currentTimeMillis()));
                 config.rules.clear();
                 long t = dev.villagerreroller.game.GameActions.dayTime(mc);
                 LOGGER.info("VRTEST clock time={} resting={} sleeping={}", t,
@@ -200,6 +219,7 @@ public final class VillagerRerollerClient implements ClientModInitializer {
                 LOGGER.info("VRTEST start-without-calibration refused={}", !started);
                 config.rules.remove("minecraft:mending");
             } else if (selftestTicks == 420) {
+                CONTROLLER.stats.clear();
                 LOGGER.info("VRTEST done");
                 selftestTicks = 1000;
             }
